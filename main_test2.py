@@ -7,6 +7,5 @@ nn_model = NeuralNetworksModel({"flag_run": True,
                         })
 
 for i in range(1, 10):
-    par_in, temp_in = nn_model.step()
-    print("par_in : ", par_in)
-    print("temp_in : ", temp_in)
+    obs = nn_model.step()
+    print("observation_measurements_in : ", obs)

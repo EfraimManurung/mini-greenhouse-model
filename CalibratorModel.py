@@ -776,17 +776,77 @@ class CalibratorModel(gym.Env):
         time_steps_formatted = range(0, self.season_length_nn)
         print("Time Steps Formatted: ", time_steps_formatted)
         
+        # Evaluate predictions to get R² and MAE metrics
+        metrics_nn, metrics_gl = self.evaluate_predictions()
+        
         # Save all the data in an Excel file
-        self.service_functions.export_to_excel(file_name, time_steps_formatted, 
-                                            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
-                                            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-                                            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl)
+        self.service_functions.export_to_excel(
+            file_name, time_steps_formatted, 
+            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl
+        )
 
         # Plot the data
-        self.service_functions.plot_all_data(time_steps_formatted, 
-                                            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
-                                            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-                                            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl)
+        self.service_functions.plot_all_data(
+            time_steps_formatted, 
+            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
+            metrics_nn, metrics_gl
+        )
+
+    def evaluate_predictions(self):
+        '''
+        Evaluate the R² and MAE of the predicted vs actual values for `par_in`, `temp_in`, `rh_in`, and `co2_in`.
+        '''
+        
+        # Extract actual values
+        y_true_par_in = self.global_in_excel
+        y_true_temp_in = self.temp_in_excel
+        y_true_rh_in = self.rh_in_excel
+        y_true_co2_in = self.co2_in_excel
+
+        # Extract predicted values
+        y_pred_par_in_nn = self.par_in_predicted_nn[:, 0]
+        y_pred_temp_in_nn = self.temp_in_predicted_nn[:, 0]
+        y_pred_rh_in_nn = self.rh_in_predicted_nn[:, 0]
+        y_pred_co2_in_nn = self.co2_in_predicted_nn[:, 0]
+        
+        y_pred_par_in_gl = self.PAR_in_predicted_gl
+        y_pred_temp_in_gl = self.temp_in_predicted_gl
+        y_pred_rh_in_gl = self.rh_in_predicted_gl
+        y_pred_co2_in_gl = self.co2_in_predicted_gl
+
+        # Calculate R² and MAE for each variable
+        def calculate_metrics(y_true, y_pred):
+            r2 = metrics.r2_score(y_true, y_pred)
+            mae = metrics.mean_absolute_error(y_true, y_pred)
+            return r2, mae
+
+        metrics_nn = {
+            'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_nn),
+            'Temperature': calculate_metrics(y_true_temp_in, y_pred_temp_in_nn),
+            'Humidity': calculate_metrics(y_true_rh_in, y_pred_rh_in_nn),
+            'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_nn)
+        }
+
+        metrics_gl = {
+            'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_gl),
+            'Temperature': calculate_metrics(y_true_temp_in, y_pred_temp_in_gl),
+            'Humidity': calculate_metrics(y_true_rh_in, y_pred_rh_in_gl),
+            'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_gl)
+        }
+
+        # Print the results
+        print("Evaluation Results:")
+        for variable in ['PAR', 'Temperature', 'Humidity', 'CO2']:
+            r2_nn, mae_nn = metrics_nn[variable]
+            r2_gl, mae_gl = metrics_gl[variable]
+            print(f"{variable} (NN): R² = {r2_nn:.4f}, MAE = {mae_nn:.4f}")
+            print(f"{variable} (GL): R² = {r2_gl:.4f}, MAE = {mae_gl:.4f}")
+
+        return metrics_nn, metrics_gl
 
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

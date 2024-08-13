@@ -4,7 +4,7 @@ from NeuralNetworksModel import NeuralNetworksModel
 nn_model = NeuralNetworksModel({"flag_run": True,
                                 "first_day": 0,
                                 "season_length": 0, 
-                                "max_steps": 500
+                                "max_steps": 6
                                })
 
 terminated = truncated = False

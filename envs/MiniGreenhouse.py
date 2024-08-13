@@ -233,7 +233,7 @@ class MiniGreenhouse(gym.Env):
         self.heater_list.extend(self.controls['heater'].flatten()[-4:])
         sio.savemat('controls.mat', self.controls)
         
-    def run_matlab_script(self, outdoor_file = None, indoor_file=None, fruit_file=None):
+    def run_matlab_script(self, controls_file = None, outdoor_file = None, indoor_file=None, fruit_file=None):
         '''
         Run the MATLAB script.
         '''
@@ -246,8 +246,11 @@ class MiniGreenhouse(gym.Env):
         
         if outdoor_file is None:
             outdoor_file = []
+        
+        if controls_file is None:
+            controls_file = []
 
-        self.eng.DrlGlEnvironment(self.season_length, self.first_day, 'controls.mat', outdoor_file, indoor_file, fruit_file, nargout=0)
+        self.eng.DrlGlEnvironment(self.season_length, self.first_day, controls_file, outdoor_file, indoor_file, fruit_file, nargout=0)
 
     def load_mat_data(self):
         '''
@@ -541,9 +544,9 @@ class MiniGreenhouse(gym.Env):
 
         # Run the script with the updated state variables
         if self.online_measurements == True:
-            self.run_matlab_script('outdoor.mat', 'indoor.mat', 'fruit.mat')
+            self.run_matlab_script('controls.mat', 'outdoor.mat', 'indoor.mat', 'fruit.mat')
         else:
-            self.run_matlab_script(None, 'indoor.mat', 'fruit.mat')
+            self.run_matlab_script(None, None, 'indoor.mat', 'fruit.mat')
         
         # Load the updated data from the .mat file
         self.load_mat_data()

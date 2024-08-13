@@ -1,5 +1,5 @@
 '''
-Calibrator model with Artifical Neural Networks and physics based model (the GreenModel) algorithm. 
+Calibrator model with Artifical Neural Networks algorithm and glysics based model (the GreenLight model). 
 In this class we will combine the ANN model with the GreenLight model.
 
 Author: Efraim Manurung
@@ -30,6 +30,7 @@ Other sources:
     -
 '''
 
+# IMPORT LIBRARIES for DRL model 
 # Import Farama foundation's gymnasium
 import gymnasium as gym
 from gymnasium.spaces import Box
@@ -37,37 +38,51 @@ from gymnasium.spaces import Box
 # Import supporting libraries
 import numpy as np
 import scipy.io as sio
-import matlab.engine
 import os
 from datetime import timedelta
 import pandas as pd
 
+# IMPORT LIBRARIES for the matlab file
+import matlab.engine
+
 # Import service functions
 from utils.ServiceFunctions import ServiceFunctions
 
-class MiniGreenhouse(gym.Env):
+# IMPORT LIBRARIES for NN model
+from utils.ServiceFunctions import ServiceFunctions
+
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+import joblib
+import pandas as pd
+import numpy as np
+import sklearn.metrics as metrics
+
+
+class CalibratorModel(gym.Env):
     '''
-    MiniGreenhouse environment, a custom environment based on the GreenLight model
-    and real mini-greenhouse.
+    Calibrator model that combine a NN model and glysics based model.
     
     Link the Python code to matlab program with related methods. We can link it with the .mat file.
     '''
     
     def __init__(self, env_config):
         '''
-        Initialize the MiniGreenhouse environment.
+        Initialize the environment.
         
         Parameters:
         env_config(dict): Configuration dictionary for the environment.
         '''  
         
-        print("MiniGreenhouse Environment initiated!")
+        print("Initialized CalibratorModel!")
         
         # Initialize if the main program for training or running
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
         self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
+        self.flag_action_from_drl = env_config.get("flag_action_from_drl", False) # Default is false, and we will use the action from offline datasets
+        
         # or just only using offline datasets
-        self.first_day = env_config.get("first_day", 1) # The first day of the simulation
+        self.first_day_gl = env_config.get("first_day", 1) # The first day of the simulation
         
         # Define the season length parameter
         # 20 minutes
@@ -75,7 +90,8 @@ class MiniGreenhouse(gym.Env):
         # only count for the 15 minutes
         # The calculation look like this:
         # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
-        self.season_length = env_config.get("season_length", 1 / 72) #* 3/4
+        self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
+        self.season_length_nn = env_config.get("season_length_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 4) # How many iteration the program run
@@ -87,7 +103,18 @@ class MiniGreenhouse(gym.Env):
         # Change path based on your directory!
         self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
 
+        # Load the datasets from separate files for the NN model
+        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
+        
+        # Load the dataset
+        self.mgh_data = pd.read_excel(file_path)
+        
+        # Display the first few rows of the dataframe
+        print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
+        print(self.mgh_data.head())
+        
         # Initialize lists to store control values
+        # if self.flag_action_from_drl == True:
         self.ventilation_list = []
         self.toplights_list = []
         self.heater_list = []
@@ -107,6 +134,8 @@ class MiniGreenhouse(gym.Env):
         # Check if MATLAB script exists
         if os.path.isfile(self.matlab_script_path):
             
+            # Initialize lists to store control values
+            #if self.flag_action_from_drl == True:
             # Initialize control variables to zero 
             self.init_controls()
             
@@ -124,14 +153,82 @@ class MiniGreenhouse(gym.Env):
         else:
             print(f"MATLAB script not found: {self.matlab_script_path}")
 
-        # Load the data from the .mat file
-        self.load_mat_data()
+        # Predict from the gl model
+        self.predicted_inside_measurements_gl()
+        
+        # Predict from the NN model
+        self.predicted_inside_measurements_nn()
         
         # Define the observation and action space
         self.define_spaces()
         
         # Initialize the state
         self.reset()
+    
+    def r2_score_metric(self, y_true, y_pred):
+        '''
+        Custom R2 score metric
+        
+        Parameters:
+        y_true: tf.Tensor - Ground truth values.
+        y_pred: tf.Tensor - Predicted values.
+        
+        Returns: 
+        float: R2 score metric 
+        '''
+        SS_res =  tf.reduce_sum(tf.square(y_true - y_pred)) 
+        SS_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true))) 
+        return (1 - SS_res/(SS_tot + tf.keras.backend.epsilon()))
+    
+    def predict_inside_measurements(self, target_variable, data_input):
+        '''
+        Predict the measurements or state variables inside mini-greenhouse 
+        
+        Parameters:
+        target_variable: str - The target variable to predict.
+        data_input: dict or pd.DataFrame - The input features for the prediction.
+
+        Features (inputs):
+            Outside measurements information
+                - time
+                - global out
+                - temp out
+                - rh out
+                - co2 out
+            Control(s) input
+                - ventilation
+                - toplights
+                - heater
+        
+        Return: 
+        np.array: predicted measurements inside mini-greenhouse
+        '''
+        if isinstance(data_input, dict):
+            data_input = pd.DataFrame(data_input)
+        
+        # Need to be fixed
+        features = ['time', 'global out', 'temp out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
+    
+        # Ensure the data_input has the required features
+        for feature in features:
+            if feature not in data_input.columns:
+                raise ValueError(f"Missing feature '{feature}' in the input data.")
+        
+        X_features = data_input[features]
+        
+        # Load the model using the native Keras format
+        loaded_model = load_model(f'nn-model/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        
+        # Load the scalerc:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\main_run.py
+        scaler = joblib.load(f'nn-model/{target_variable}_scaler.pkl')
+            
+        # Scale the input features
+        X_features_scaled = scaler.transform(X_features)
+        
+        # Predict the measurements
+        y_hat_measurements = loaded_model.predict(X_features_scaled)
+        
+        return y_hat_measurements
     
     def define_spaces(self):
         '''
@@ -188,7 +285,7 @@ class MiniGreenhouse(gym.Env):
         self.heater_list.extend(self.controls['heater'].flatten()[-4:])
         sio.savemat('controls.mat', self.controls)
         
-    def run_matlab_script(self, controls_file = None, outdoor_file = None, indoor_file=None, fruit_file=None):
+    def run_matlab_script(self, outdoor_file = None, indoor_file=None, fruit_file=None):
         '''
         Run the MATLAB script.
         '''
@@ -202,12 +299,104 @@ class MiniGreenhouse(gym.Env):
         if outdoor_file is None:
             outdoor_file = []
         
-        if controls_file is None:
-            controls_file = []
+        self.eng.DrlGlEnvironment(self.season_length_gl, self.first_day_gl, 'controls.mat', outdoor_file, indoor_file, fruit_file, nargout=0)
 
-        self.eng.DrlGlEnvironment(self.season_length, self.first_day, controls_file, outdoor_file, indoor_file, fruit_file, nargout=0)
+    def load_excel_data(self):
+        '''
+        Load data from .xlsx file and store in instance variables.
+        
+        The data is appended to existing variables if they already exist.
+        '''
 
-    def load_mat_data(self):
+        # Slice the dataframe to get the rows for the current step
+        self.step_data = self.mgh_data.iloc[self.season_length_nn:self.season_length_nn + 4]
+
+        # Extract the required columns and flatten them
+        new_time_excel = self.step_data['time'].values
+        new_global_out_excel = self.step_data['global out'].values
+        new_global_in_excel = self.step_data['global in'].values
+        new_temp_in_excel = self.step_data['temp in'].values
+        new_temp_out_excel = self.step_data['temp out'].values
+        new_rh_in_excel = self.step_data['rh in'].values
+        new_rh_out_excel = self.step_data['rh out'].values
+        new_co2_in_excel = self.step_data['co2 in'].values
+        new_co2_out_excel = self.step_data['co2 out'].values
+        new_toplights_excel = self.step_data['toplights'].values
+        new_ventilation_excel = self.step_data['ventilation'].values
+        new_heater_excel = self.step_data['heater'].values
+
+        # Check if instance variables already exist; if not, initialize them
+        if not hasattr(self, 'time_excel'):
+            self.time_excel = new_time_excel
+            self.global_out_excel = new_global_out_excel
+            self.global_in_excel = new_global_in_excel
+            self.temp_in_excel = new_temp_in_excel
+            self.temp_out_excel = new_temp_out_excel
+            self.rh_in_excel = new_rh_in_excel
+            self.rh_out_excel = new_rh_out_excel
+            self.co2_in_excel = new_co2_in_excel
+            self.co2_out_excel = new_co2_out_excel
+            self.toplights_excel = new_toplights_excel
+            self.ventilation_excel = new_ventilation_excel
+            self.heater_excel = new_heater_excel
+        else:
+            # Concatenate new data with existing data
+            self.time_excel = np.concatenate((self.time_excel, new_time_excel))
+            self.global_out_excel = np.concatenate((self.global_out_excel, new_global_out_excel))
+            self.global_in_excel = np.concatenate((self.global_in_excel, new_global_in_excel))
+            self.temp_in_excel = np.concatenate((self.temp_in_excel, new_temp_in_excel))
+            self.temp_out_excel = np.concatenate((self.temp_out_excel, new_temp_out_excel))
+            self.rh_in_excel = np.concatenate((self.rh_in_excel, new_rh_in_excel))
+            self.rh_out_excel = np.concatenate((self.rh_out_excel, new_rh_out_excel))
+            self.co2_in_excel = np.concatenate((self.co2_in_excel, new_co2_in_excel))
+            self.co2_out_excel = np.concatenate((self.co2_out_excel, new_co2_out_excel))
+            self.toplights_excel = np.concatenate((self.toplights_excel, new_toplights_excel))
+            self.ventilation_excel = np.concatenate((self.ventilation_excel, new_ventilation_excel))
+            self.heater_excel = np.concatenate((self.heater_excel, new_heater_excel))
+    
+    def predicted_inside_measurements_nn(self):
+        '''
+        Predicted inside measurements
+        
+        '''
+        # Load the updated data from the excel file
+        self.load_excel_data()
+        
+        # Predict the inside measurements (the state variable inside the mini-greenhouse)
+        new_par_in_predicted_nn = self.predict_inside_measurements('global in', self.step_data)
+        new_temp_in_predicted_nn = self.predict_inside_measurements('temp in', self.step_data)
+        new_rh_in_predicted_nn = self.predict_inside_measurements('rh in', self.step_data)
+        new_co2_in_predicted_nn = self.predict_inside_measurements('co2 in', self.step_data)
+    
+        # Check if instance variables already exist; if not, initialize them
+        if not hasattr(self, 'temp_in_predicted_nn'):
+            self.par_in_predicted_nn = new_par_in_predicted_nn
+            self.temp_in_predicted_nn = new_temp_in_predicted_nn
+            self.rh_in_predicted_nn = new_rh_in_predicted_nn
+            self.co2_in_predicted_nn = new_co2_in_predicted_nn
+            
+            # print("LENGTH self.par_in_predicted", len(self.par_in_predicted_nn))
+            # print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted_nn))
+            # print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted_nn))
+            # print("LENGTH self.co2_in_predicted", len(self.co2_in_predicted_nn))
+        else:
+            # Concatenate new data with existing data
+            self.par_in_predicted_nn = np.concatenate((self.par_in_predicted_nn, new_par_in_predicted_nn))
+            self.temp_in_predicted_nn = np.concatenate((self.temp_in_predicted_nn, new_temp_in_predicted_nn))
+            self.rh_in_predicted_nn = np.concatenate((self.rh_in_predicted_nn, new_rh_in_predicted_nn))
+            self.co2_in_predicted_nn = np.concatenate((self.co2_in_predicted_nn, new_co2_in_predicted_nn))
+            
+            # print("self.par_in_predicted", self.par_in_predicted)
+            # print("self.temp_in_predicted", self.temp_in_predicted)
+            # print("self.rh_in_predicted", self.rh_in_predicted)
+            # print("self.co2_in_predicted", self.co2_in_predicted)
+            
+            print("LENGTH self.par_in_predicted", len(self.par_in_predicted_nn))
+            print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted_nn))
+            print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted_nn))
+            print("LENGTH self.co2_in_predicted", len(self.co2_in_predicted_nn))
+    
+    def predicted_inside_measurements_gl(self):
         '''
         Load data from the .mat file.
         
@@ -220,41 +409,40 @@ class MiniGreenhouse(gym.Env):
         # Read the 3 values and append it
         data = sio.loadmat("drl-env.mat")
         
-        new_time = data['time'].flatten()[-4:]
-        new_co2_in = data['co2_in'].flatten()[-4:]
-        new_temp_in = data['temp_in'].flatten()[-4:]
-        new_rh_in = data['rh_in'].flatten()[-4:]
-        new_PAR_in = data['PAR_in'].flatten()[-4:]
-        new_fruit_leaf = data['fruit_leaf'].flatten()[-4:]
-        new_fruit_stem = data['fruit_stem'].flatten()[-4:]
-        new_fruit_dw = data['fruit_dw'].flatten()[-4:]
-        new_fruit_cbuf = data['fruit_cbuf'].flatten()[-4:]
-        new_fruit_tcansum = data['fruit_tcansum'].flatten()[-4:]
+        new_time_gl = data['time'].flatten()[-4:]
+        new_co2_in_predicted_gl = data['co2_in'].flatten()[-4:]
+        new_temp_in_predicted_gl = data['temp_in'].flatten()[-4:]
+        new_rh_in_predicted_gl = data['rh_in'].flatten()[-4:]
+        new_PAR_in_predicted_gl = data['PAR_in'].flatten()[-4:]
+        new_fruit_leaf_predicted_gl = data['fruit_leaf'].flatten()[-4:]
+        new_fruit_stem_predicted_gl = data['fruit_stem'].flatten()[-4:]
+        new_fruit_dw_predicted_gl = data['fruit_dw'].flatten()[-4:]
+        new_fruit_cbuf_predicted_gl = data['fruit_cbuf'].flatten()[-4:]
+        new_fruit_tcansum_predicted_gl = data['fruit_tcansum'].flatten()[-4:]
 
-        if not hasattr(self, 'time'):
-            self.time = new_time
-            self.co2_in = new_co2_in
-            self.temp_in = new_temp_in
-            self.rh_in = new_rh_in
-            self.PAR_in = new_PAR_in
-            self.fruit_leaf = new_fruit_leaf
-            self.fruit_stem = new_fruit_stem
-            self.fruit_dw = new_fruit_dw
-            self.fruit_cbuf = new_fruit_cbuf
-            self.fruit_tcansum = new_fruit_tcansum
+        if not hasattr(self, 'time_gl'):
+            self.time_gl = new_time_gl
+            self.co2_in_predicted_gl = new_co2_in_predicted_gl
+            self.temp_in_predicted_gl = new_temp_in_predicted_gl
+            self.rh_in_predicted_gl = new_rh_in_predicted_gl
+            self.PAR_in_predicted_gl = new_PAR_in_predicted_gl
+            self.fruit_leaf_predicted_gl = new_fruit_leaf_predicted_gl
+            self.fruit_stem_predicted_gl = new_fruit_stem_predicted_gl
+            self.fruit_dw_predicted_gl = new_fruit_dw_predicted_gl
+            self.fruit_cbuf_predicted_gl = new_fruit_cbuf_predicted_gl
+            self.fruit_tcansum_predicted_gl = new_fruit_tcansum_predicted_gl
         else:
-            self.time = np.concatenate((self.time, new_time))
-            self.co2_in = np.concatenate((self.co2_in, new_co2_in))
-            self.temp_in = np.concatenate((self.temp_in, new_temp_in))
-            self.rh_in = np.concatenate((self.rh_in, new_rh_in))
-            self.PAR_in = np.concatenate((self.PAR_in, new_PAR_in))
-            self.fruit_leaf = np.concatenate((self.fruit_leaf, new_fruit_leaf))
-            self.fruit_stem = np.concatenate((self.fruit_stem, new_fruit_stem))
-            self.fruit_dw = np.concatenate((self.fruit_dw, new_fruit_dw))
-            self.fruit_cbuf = np.concatenate((self.fruit_cbuf, new_fruit_cbuf))
-            self.fruit_tcansum = np.concatenate((self.fruit_tcansum, new_fruit_tcansum))
+            self.time_gl = np.concatenate((self.time_gl, new_time_gl))
+            self.co2_in_predicted_gl = np.concatenate((self.co2_in_predicted_gl, new_co2_in_predicted_gl))
+            self.temp_in_predicted_gl = np.concatenate((self.temp_in_predicted_gl, new_temp_in_predicted_gl))
+            self.rh_in_predicted_gl= np.concatenate((self.rh_in_predicted_gl, new_rh_in_predicted_gl))
+            self.PAR_in_predicted_gl = np.concatenate((self.PAR_in_predicted_gl, new_PAR_in_predicted_gl))
+            self.fruit_leaf_predicted_gl = np.concatenate((self.fruit_leaf_predicted_gl, new_fruit_leaf_predicted_gl))
+            self.fruit_stem_predicted_gl = np.concatenate((self.fruit_stem_predicted_gl, new_fruit_stem_predicted_gl))
+            self.fruit_dw_predicted_gl = np.concatenate((self.fruit_dw_predicted_gl, new_fruit_dw_predicted_gl))
+            self.fruit_cbuf_predicted_gl = np.concatenate((self.fruit_cbuf_predicted_gl, new_fruit_cbuf_predicted_gl))
+            self.fruit_tcansum_predicted_gl = np.concatenate((self.fruit_tcansum_predicted_gl, new_fruit_tcansum_predicted_gl))
         
-
     def reset(self, *, seed=None, options=None):
         '''
         Reset the environment to the initial state.
@@ -263,6 +451,7 @@ class MiniGreenhouse(gym.Env):
         int: The initial observation of the environment.
         '''
         self.current_step = 0
+        self.season_length_nn += 4
         
         return self.observation(), {}
 
@@ -274,18 +463,34 @@ class MiniGreenhouse(gym.Env):
         array: The observation space of the environment.
         '''
         
+        # return np.array([
+        #     self.co2_in[-1],
+        #     self.temp_in[-1],
+        #     self.rh_in[-1],
+        #     self.global_in[-1],
+        #     self.global_out[-1],
+        #     self.temp_out[-1],
+        #     self.rh_out[-1],
+        #     self.toplights[-1],
+        #     self.ventilation[-1],
+        #     self.heater[-1],
+        #     self.par_in_predicted[-1][0],  # Ensure this is a scalar value
+        #     self.temp_in_predicted[-1][0], # Ensure this is a scalar value
+        #     self.rh_in_predicted[-1][0],   # Ensure this is a scalar value
+        #     self.co2_in_predicted[-1][0]   # Ensure this is a scalar value
+        # ], np.float32)
+        
         return np.array([
-            self.co2_in[-1],
-            self.temp_in[-1],
-            self.rh_in[-1],
-            self.PAR_in[-1],
-            self.fruit_leaf[-1],
-            self.fruit_stem[-1],
-            self.fruit_dw[-1],
-            self.fruit_cbuf[-1],
-            self.fruit_tcansum[-1]
-        ], np.float32)
-       
+            self.co2_in_predicted_gl[-1],
+            self.temp_in_predicted_gl[-1],
+            self.rh_in_predicted_gl[-1],
+            self.PAR_in_predicted_gl[-1],
+            self.fruit_leaf_predicted_gl[-1],
+            self.fruit_stem_predicted_gl[-1],
+            self.fruit_dw_predicted_gl[-1],
+            self.fruit_cbuf_predicted_gl[-1],
+            self.fruit_tcansum_predicted_gl[-1]
+        ], np.float32) 
 
     def get_reward(self, _ventilation, _toplights, _heater):
         '''
@@ -330,7 +535,7 @@ class MiniGreenhouse(gym.Env):
         # In the createCropModel.m in the GreenLight model (mini-greenhouse-model)
         # cFruit or dry weight of fruit is the carbohydrates in fruit, so it is the best variable to count for the reward
         # Calculate the change in fruit dry weight
-        delta_fruit_dw = (self.fruit_dw[-1] - self.fruit_dw[-2])
+        delta_fruit_dw = (self.fruit_dw_predicted_gl[-1] - self.fruit_dw_predicted_gl[-2])
         print("delta_fruit_dw: ", delta_fruit_dw)
         
         r_k = w_r_y1 * delta_fruit_dw - ((w_r_a1 * _ventilation) + (w_r_a2 * _toplights) + (w_r_a3 * _heater))
@@ -349,7 +554,6 @@ class MiniGreenhouse(gym.Env):
 
         if self.online_measurements == True:
             os.remove('outdoor.mat')  # outdoor measurements
-        
         
     def done(self):
         '''
@@ -385,7 +589,7 @@ class MiniGreenhouse(gym.Env):
             
         return False
 
-    def step(self, _action):
+    def step(self, _action_drl = None):
         '''
         Take an action in the environment.
         
@@ -408,25 +612,34 @@ class MiniGreenhouse(gym.Env):
         print("")
         print("----------------------------------")
         print("CURRENT STEPS: ", self.current_step)
-
-        print("ACTION: ", _action)
         
-        # Convert actions to discrete values
-        ventilation = 1 if _action[0] >= 0.5 else 0
-        toplights = 1 if _action[1] >= 0.5 else 0
-        heater = 1 if _action[2] >= 0.5 else 0
+        # Call the predicted inside measurements with the NN model
+        self.predicted_inside_measurements_nn()
+        
+        if self.flag_action_from_drl == True:
+            print("ACTION: ", _action_drl)
+            
+            # Convert actions to discrete values
+            ventilation = 1 if _action_drl[0] >= 0.5 else 0
+            toplights = 1 if _action_drl[1] >= 0.5 else 0
+            heater = 1 if _action_drl[2] >= 0.5 else 0
+            
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = np.full(4, ventilation)
+            toplights = np.full(4, toplights)
+            heater = np.full(4, heater)
+
+        else:
+            # Get the actions from the excel file (offlien datasets)
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = self.ventilation_excel[-4:]
+            toplights = self.toplights_excel[-4:]
+            heater = self.heater_excel[-4:]
         
         print("CONVERTED ACTION")
         print("ventilation: ", ventilation)
         print("toplights: ", toplights)
         print("heating: ", heater)
-
-        # TO-DO: Refactor this so the time_steps is not reset from beginning but increment it
-        
-        time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-        ventilation = np.full(4, ventilation)
-        toplights = np.full(4, toplights)
-        heater = np.full(4, heater)
 
         # Keep only the latest 3 data points before appending
         # Append controls to the lists
@@ -455,26 +668,29 @@ class MiniGreenhouse(gym.Env):
         # Save control variables to .mat file
         sio.savemat('controls.mat', controls)
         
-        # Update the season_length and first_day
+        # Update the season_length and first_day for the GL model
         # 1 / 72 is 20 minutes in 24 hours, the calculation look like this
         # 1 / 72 * 24 [hours] * 60 [minutes . hours ^ -1] = 20 minutes 
-        self.season_length = 1 / 72 
-        self.first_day += 1 / 72 
+        self.season_length_gl = 1 / 72 
+        self.first_day_gl += 1 / 72 
+        
+        # Update the season_length for the NN model
+        self.season_length_nn += 4
 
         # Convert co2_in ppm
-        co2_density = self.service_functions.co2ppm_to_dens(self.temp_in[-4:], self.co2_in[-4:])
+        co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_gl[-4:], self.co2_in_predicted_gl[-4:])
         
         # Convert Relative Humidity (RH) to Pressure in Pa
-        vapor_density = self.service_functions.rh_to_vapor_density(self.temp_in[-4:], self.rh_in[-4:])
-        vapor_pressure = self.service_functions.vapor_density_to_pressure(self.temp_in[-4:], vapor_density)
+        vapor_density_gl = self.service_functions.rh_to_vapor_density(self.temp_in_predicted_gl[-4:], self.rh_in_predicted_gl[-4:])
+        vapor_pressure_gl = self.service_functions.vapor_density_to_pressure(self.temp_in_predicted_gl[-4:], vapor_density_gl)
 
         # Update the MATLAB environment with the 3 latest current state
         # It will be used to be simulated in the GreenLight model with mini-greenhouse parameters
         drl_indoor = {
-            'time': self.time[-3:].astype(float).reshape(-1, 1),
-            'temp_in': self.temp_in[-3:].astype(float).reshape(-1, 1),
-            'rh_in': vapor_pressure[-3:].astype(float).reshape(-1, 1),
-            'co2_in': co2_density[-3:].astype(float).reshape(-1, 1)
+            'time': self.time_gl[-3:].astype(float).reshape(-1, 1),
+            'temp_in': self.temp_in_predicted_gl[-3:].astype(float).reshape(-1, 1),
+            'rh_in': vapor_pressure_gl[-3:].astype(float).reshape(-1, 1),
+            'co2_in': co2_density_gl[-3:].astype(float).reshape(-1, 1)
         }
         
         # Save control variables to .mat file
@@ -482,12 +698,12 @@ class MiniGreenhouse(gym.Env):
 
         # Update the fruit growth with the 1 latest current state from the GreenLight model - mini-greenhouse parameters
         fruit_growth = {
-            'time': self.time[-1:].astype(float).reshape(-1, 1),
-            'fruit_leaf': self.fruit_leaf[-1:].astype(float).reshape(-1, 1),
-            'fruit_stem': self.fruit_stem[-1:].astype(float).reshape(-1, 1),
-            'fruit_dw': self.fruit_dw[-1:].astype(float).reshape(-1, 1),
-            'fruit_cbuf': self.fruit_cbuf[-1:].astype(float).reshape(-1, 1),
-            'fruit_tcansum': self.fruit_tcansum[-1:].astype(float).reshape(-1, 1)
+            'time': self.time_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_leaf': self.fruit_leaf_predicted_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_stem': self.fruit_stem_predicted_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_dw': self.fruit_dw_predicted_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_cbuf': self.fruit_cbuf_predicted_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_tcansum': self.fruit_tcansum_predicted_gl[-1:].astype(float).reshape(-1, 1)
         }
 
         # Save the fruit growth to .mat file
@@ -499,12 +715,12 @@ class MiniGreenhouse(gym.Env):
 
         # Run the script with the updated state variables
         if self.online_measurements == True:
-            self.run_matlab_script('controls.mat', 'outdoor.mat', 'indoor.mat', 'fruit.mat')
+            self.run_matlab_script('outdoor.mat', 'indoor.mat', 'fruit.mat')
         else:
-            self.run_matlab_script(None, None, 'indoor.mat', 'fruit.mat')
+            self.run_matlab_script(None, 'indoor.mat', 'fruit.mat')
         
-        # Load the updated data from the .mat file
-        self.load_mat_data()
+        # Load the updated data from predcited from the greenlight model
+        self.predicted_inside_measurements_gl()
         
         # Calculate reward
         # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the is the same)
@@ -518,66 +734,59 @@ class MiniGreenhouse(gym.Env):
     
         return self.observation(), _reward, self.done(), truncated, {}
     
-    def print_and_save_all_data(self, _file_name):
+    def print_and_save_all_data(self, file_name):
         '''
-        Print all the appended data.
-        '''
-        print("")
-        print("")
-        print("-------------------------------------------------------------------------------------")
-        print("Print all the appended data.")
-        # Print lengths of each list to identify discrepancies
-        print(f"Length of Time: {len(self.time)}")
-        print(f"Length of CO2 In: {len(self.co2_in)}")
-        print(f"Length of Temperature In: {len(self.temp_in)}")
-        print(f"Length of RH In: {len(self.rh_in)}")
-        print(f"Length of PAR In: {len(self.PAR_in)}")
-        #print(f"Length of Fruit leaf: {len(self.fruit_leaf)}")
-        #print(f"Length of Fruit stem: {len(self.fruit_stem)}")
-        print(f"Length of Fruit Dry Weight: {len(self.fruit_dw)}")
-        print(f"Length of Fruit cBuf: {len(self.fruit_cbuf)}")
-        print(f"Length of Fruit tCanSum: {len(self.fruit_tcansum)}")
-        print(f"Length of Ventilation: {len(self.ventilation_list)}")
-        print(f"Length of toplights: {len(self.toplights_list)}")
-        print(f"Length of Heater: {len(self.heater_list)}")
-        print(f"Length of Rewards: {len(self.rewards_list)}")
-        data = {
-            'Time': self.time,
-            'CO2 In': self.co2_in,
-            'Temperature In': self.temp_in,
-            'RH In': self.rh_in,
-            'PAR In': self.PAR_in,
-            #'Fruit leaf': self.fruit_leaf,
-            #'Fruit stem': self.fruit_stem,
-            'Fruit Dry Weight': self.fruit_dw,
-            'Fruit cBuf':self.fruit_cbuf,
-            'Fruit tCanSum': self.fruit_tcansum,
-            'Ventilation': self.ventilation_list,
-            'Toplights': self.toplights_list,
-            'Heater': self.heater_list,
-            'Rewards': self.rewards_list
-        }
-        
-        df = pd.DataFrame(data)
-        print(df)
-        
-        # Calculate time_steps for plot and save it on the excel file
-        time_max = (self.max_steps + 1) * 1200 # for e.g. 3 steps * 1200 (20 minutes) = 60 minutes
-        time_steps_seconds = np.linspace(300, time_max, (self.max_steps + 1)  * 4)  # Time steps in seconds
-        time_steps_hours = time_steps_seconds / 3600  # Convert seconds to hours
-        time_steps_formatted = [str(timedelta(hours=h))[:-3] for h in time_steps_hours]  # Format to HH:MM
-        print("time_steps_plot (in HH:MM format):", time_steps_formatted)
-        
-        # Save all the data in an excel file
-        self.service_functions.export_to_excel(_file_name, time_steps_formatted, self.co2_in, self.temp_in, self.rh_in,
-                                               self.PAR_in, self.fruit_leaf, self.fruit_stem,
-                                               self.fruit_dw, self.fruit_cbuf, self.fruit_tcansum, self.ventilation_list, self.toplights_list,
-                                               self.heater_list, self.rewards_list)
+        Print all the appended data and save to an Excel file.
 
-        self.service_functions.plot_all_data(self.max_steps, time_steps_formatted, self.co2_in, self.temp_in, self.rh_in,
-                                             self.PAR_in, self.fruit_leaf, self.fruit_stem,
-                                             self.fruit_dw, self.fruit_cbuf, self.fruit_tcansum, self.ventilation_list, self.toplights_list,
-                                             self.heater_list, self.rewards_list)
+        Parameters:
+        - file_name: Name of the output Excel file
+        
+        - co2_actual: List of actual CO2 values
+        - temp_actual: List of actual temperature values
+        - rh_actual: List of actual relative humidity values
+        - par_actual: List of actual PAR values
+        
+        - co2_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_predicted_nn: List of predicted PAR values from Neural Network
+        
+        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        '''
+        
+        print("\n\n-------------------------------------------------------------------------------------")
+        print("Print all the appended data.")
+        print(f"Length of Time: {len(self.time_excel)}")
+        print(f"Length of CO2 In (Actual): {len(self.co2_in_excel)}")
+        print(f"Length of Temperature In (Actual): {len(self.temp_in_excel)}")
+        print(f"Length of RH In (Actual): {len(self.rh_in_excel)}")
+        print(f"Length of PAR In (Actual): {len(self.global_in_excel)}")
+        print(f"Length of Predicted CO2 In (NN): {len(self.co2_in_predicted_nn)}")
+        print(f"Length of Predicted Temperature In (NN): {len(self.temp_in_predicted_nn)}")
+        print(f"Length of Predicted RH In (NN): {len(self.rh_in_predicted_nn)}")
+        print(f"Length of Predicted PAR In (NN): {len(self.par_in_predicted_nn)}")
+        print(f"Length of Predicted CO2 In (GL): {len(self.co2_in_predicted_gl)}")
+        print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
+        print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
+        print(f"Length of Predicted PAR In (GL): {len(self.PAR_in_predicted_gl)}")
+
+        time_steps_formatted = range(0, self.season_length_nn)
+        print("Time Steps Formatted: ", time_steps_formatted)
+        
+        # Save all the data in an Excel file
+        self.service_functions.export_to_excel(file_name, time_steps_formatted, 
+                                            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+                                            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                                            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl)
+
+        # Plot the data
+        self.service_functions.plot_all_data(time_steps_formatted, 
+                                            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+                                            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                                            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl)
 
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

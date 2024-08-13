@@ -138,123 +138,107 @@ class ServiceFunctions:
         vaporPres = _satP * _rh
         
         return vaporPres
-    
-    def plot_all_data(self, _data, time, co2_in, temp_in, rh_in, PAR_in, fruit_leaf, fruit_stem, fruit_dw, fruit_cbuf, fruit_tcansum, ventilation, toplights, heater, rewards):
+
+    def plot_all_data(self, time, co2_actual, temp_actual, rh_actual, par_actual, 
+                    co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
+                    co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl):
         '''
-        Plot all the parameters to make it easier to see.
-        
+        Plot all the parameters to make it easier to compare predicted vs actual values.
+
         Parameters:
         - time: List of time values
-        - co2_in: List of CO2 values
-        - temp_in: List of temperature values
-        - rh_in: List of relative humidity values
-        - PAR_in: List of PAR values
-        - fruit_leaf: List of fruit leaf values
-        - fruit_stem: List of fruit stem values
-        - fruit_dw: List of fruit dry weight values
-        - fruit_cbuf: List of fruit carbohydrate buffer values
-        - fruit_tcansum: List of fruit total canopy sum values
-        - ventilation: List of ventilation control values
-        - toplights: List of toplights control values
-        - heater: List of heater control values
-        - rewards: List of reward values
+        
+        - co2_actual: List of actual CO2 values
+        - temp_actual: List of actual temperature values
+        - rh_actual: List of actual relative humidity values
+        - par_actual: List of actual PAR values
+        
+        - co2_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_predicted_nn: List of predicted PAR values from Neural Network
+        
+        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
-        
-        # Create subplots with 4 rows and 3 columns
-        fig, axes = plt.subplots(nrows=5, ncols=3, figsize=(18, 12))
-        
-        # Data to be plotted along with their titles
+
+        # Create subplots with 2 rows and 2 columns
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
+
+        # Data to be plotted along with their titles and predicted data
         data = [
-            (co2_in, 'CO2 In [ppm]'),
-            (temp_in, 'Temperature In [°C]'),
-            (rh_in, 'RH In [%]'),
-            (PAR_in, 'PAR In [W/m2]'),
-            (fruit_leaf, r'Fruit Leaf [mg (CH$_2$O) m$^{-2}$]'),
-            (fruit_stem, r'Fruit Stem [mg (CH$_2$O) m$^{-2}$]'),
-            (fruit_dw, r'Fruit Dry Weight [mg (CH$_2$O) m$^{-2}$]'),
-            (fruit_cbuf, r'Fruit Carbohydrate Buffer [mg (CH$_2$O) m$^{-2}$]'),
-            (fruit_tcansum, r'Fruit Total Canopy Sum [mg (CH$_2$O) m$^{-2}$]'),
-            (ventilation, 'Ventilation [-]'),
-            (toplights, 'Toplights [-]'),
-            (heater, 'Heater [-]'),
-            (rewards, 'Rewards [-]')
+            (co2_actual, co2_predicted_nn, co2_predicted_gl, 'CO2 In [ppm]'),
+            (temp_actual, temp_predicted_nn, temp_predicted_gl, 'Temperature In [°C]'),
+            (rh_actual, rh_predicted_nn, rh_predicted_gl, 'RH In [%]'),
+            (par_actual, par_predicted_nn, par_predicted_gl, 'PAR In [W/m2]')
         ]
-        
-        if _data <= 4:
-            # Plot each dataset in a subplot
-            for ax, (y_data, title) in zip(axes.flatten(), data):
-                ax.plot(time, y_data)  # Plot data
-                ax.set_xlabel('Time')  # Set the x-axis label
-                ax.set_ylabel(title)  # Set the y-axis label
-                ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
-                ax.set_xticks(range(len(time)))  # Set the positions of the ticks on the x-axis
-                ax.set_xticklabels(time, rotation=45, ha='right')  # Set the tick labels on the x-axis
-        else:
-            # Set x-axis labels at 4-hour intervals
-            interval = 2 * 12  # 4 hours * 12 (5-minute intervals per hour)
-            hourly_indices = np.arange(0, len(time), interval)
-            time_hourly_labels = [time[i] for i in hourly_indices]
-            
-            # Plot each dataset in a subplot
-            for ax, (y_data, title) in zip(axes.flatten(), data):
-                ax.plot(time, y_data)  # Plot data
-                ax.set_xlabel('Time')  # Set the x-axis label
-                ax.set_ylabel(title)  # Set the y-axis label
-                ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
-                ax.set_xticks(hourly_indices)  # Set the positions of the ticks on the x-axis
-                ax.set_xticklabels(time_hourly_labels, rotation=45, ha='right')  # Set the tick labels on the x-axis
-            
+
+        # Plot each dataset in a subplot
+        for ax, (y_actual, y_pred_nn, y_pred_gl, title) in zip(axes.flatten(), data):
+            ax.plot(time, y_actual, label='Actual', color='blue')  # Plot actual data
+            ax.plot(time, y_pred_nn, label='Predicted NN', color='red', linestyle='--')  # Plot NN predicted data
+            ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')  # Plot GL predicted data
+            ax.set_xlabel('Timesteps [- / 5 minutes]')  # Set the x-axis label
+            ax.set_ylabel(title)  # Set the y-axis label
+            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
+            ax.legend()  # Add legend to distinguish between actual and predicted data
+
         # Adjust the layout to prevent overlap
         plt.tight_layout()
         plt.show()
-        
-    def export_to_excel(self, filename, time, co2_in, temp_in, rh_in, PAR_in, fruit_leaf, fruit_stem, fruit_dw, fruit_cbuf, fruit_tcansum, ventilation, toplights, heater, rewards):
+
+    import pandas as pd
+
+    def export_to_excel(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual,
+                        co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
+                        co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl):
         '''
-        Export all the appended data to an Excel file.
-        
+        Export all the appended data to an Excel file including both actual and predicted values.
+
         Parameters:
         - filename: Name of the output Excel file
         - time: List of time values
-        - co2_in: List of CO2 values
-        - temp_in: List of temperature values
-        - rh_in: List of relative humidity values
-        - PAR_in: List of PAR values
-        - fruit_leaf: List of fruit leaf values
-        - fruit_stem: List of fruit stem values
-        - fruit_dw: List of fruit dry weight values
-        - fruit_cbuf: List of fruit carbohydrate buffer values
-        - fruit_tcansum: List of fruit total canopy sum values
-        - ventilation: List of ventilation control values
-        - toplights: List of toplights control values
-        - heater: List of heater control values
-        - rewards: List of reward values
+        
+        - co2_actual: List of actual CO2 values
+        - temp_actual: List of actual temperature values
+        - rh_actual: List of actual relative humidity values
+        - par_actual: List of actual PAR values
+        
+        - co2_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_predicted_nn: List of predicted PAR values from Neural Network
+        
+        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
-        
-        # Print the lengths of each list
-        print(f"Lengths -> time: {len(time)}, co2_in: {len(co2_in)}, temp_in: {len(temp_in)}, rh_in: {len(rh_in)}, PAR_in: {len(PAR_in)}, fruit_leaf: {len(fruit_leaf)}, fruit_stem: {len(fruit_stem)}, fruit_dw: {len(fruit_dw)}, fruit_cbuf: {len(fruit_cbuf)}, fruit_tcansum: {len(fruit_tcansum)}, ventilation: {len(ventilation)}, toplights: {len(toplights)}, heater: {len(heater)}, rewards: {len(rewards)}")
-        
+
         data = {
-            'Time': time,
-            'CO2 In': co2_in,
-            'Temperature In': temp_in,
-            'RH In': rh_in,
-            'PAR In': PAR_in,
-            'Fruit leaf': fruit_leaf,
-            'Fruit stem': fruit_stem,
-            'Fruit Dry Weight': fruit_dw,
-            'Fruit Carbohydrate Buffer': fruit_cbuf,
-            'Fruit Total Canopy Sum': fruit_tcansum,
-            'Ventilation': ventilation,
-            'Toplights': toplights,
-            'Heater': heater,
-            'Rewards': rewards
+            'Timesteps [- / 5 minutes]': time,
+            'CO2 In (Actual)': co2_actual,
+            'CO2 In (Predicted NN)': co2_predicted_nn,
+            'CO2 In (Predicted GL)': co2_predicted_gl,
+            'Temperature In (Actual)': temp_actual,
+            'Temperature In (Predicted NN)': temp_predicted_nn,
+            'Temperature In (Predicted GL)': temp_predicted_gl,
+            'RH In (Actual)': rh_actual,
+            'RH In (Predicted NN)': rh_predicted_nn,
+            'RH In (Predicted GL)': rh_predicted_gl,
+            'PAR In (Actual)': par_actual,
+            'PAR In (Predicted NN)': par_predicted_nn,
+            'PAR In (Predicted GL)': par_predicted_gl,
         }
-        
+
         # Check if all lists have the same length
         lengths = [len(v) for v in data.values()]
         if len(set(lengths)) != 1:
             raise ValueError("All arrays must be of the same length")
-        
+
+        # Create a DataFrame and export to Excel
         df = pd.DataFrame(data)
         df.to_excel(filename, index=False)
         print(f"Data successfully exported to {filename}")

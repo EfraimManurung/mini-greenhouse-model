@@ -29,11 +29,15 @@ Table 1 Meaning of the state x(t), measurement y(t), control signal u(t) and dis
 '''
 
 # Import supporting libraries
+from utils.ServiceFunctions import ServiceFunctions
+
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import joblib
 import pandas as pd
 import numpy as np
+
+import sklearn.metrics as metrics
 
 import os
 
@@ -54,12 +58,15 @@ class NeuralNetworksModel():
         
         print("Initialized CalibratorModel!")
         
+        # Initialize service functions
+        self.service_functions = ServiceFunctions()
+        
         # Initiliaze the variables from env_config
         self.flag_run = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
         
         self.first_day = env_config.get("first_day", 0) # The first day of the simulation
         
-        self.season_length = env_config.get("season_length", 1 * 4) # 1 / 72 in matlab is 1 step in this NN model
+        self.season_length = env_config.get("season_length", 1 * 4) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
         
         self.max_steps = env_config.get("max_steps", 4) # How many iteration the program run
         
@@ -219,6 +226,17 @@ class NeuralNetworksModel():
             self.temp_in_predicted = np.concatenate((self.temp_in_predicted, new_temp_in_predicted))
             self.rh_in_predicted = np.concatenate((self.rh_in_predicted, new_rh_in_predicted))
             self.co2_in_predicted = np.concatenate((self.co2_in_predicted, new_co2_in_predicted))
+            
+            # print("self.par_in_predicted", self.par_in_predicted)
+            # print("self.temp_in_predicted", self.temp_in_predicted)
+            # print("self.rh_in_predicted", self.rh_in_predicted)
+            # print("self.co2_in_predicted", self.co2_in_predicted)
+            
+            print("LENGTH self.par_in_predicted", len(self.par_in_predicted))
+            print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted))
+            print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted))
+            print("LENGTH self.co2_in_predicted", len(self.co2_in_predicted))
+            
     
     def observation(self):
         '''
@@ -244,7 +262,27 @@ class NeuralNetworksModel():
             self.rh_in_predicted[-1][0],   # Ensure this is a scalar value
             self.co2_in_predicted[-1][0]   # Ensure this is a scalar value
         ], np.float32)
+        
+    def done(self):
+        '''
+        Check if the episode is done.
+        
+        Returns:
+        bool: True if the episode is done, otherwise False.
+        '''
+        
+        if self.current_step >= self.max_steps:
 
+                # Evaluate the R² and MAE
+                self.evaluate_predictions()
+                
+                # Save and plot the data
+                self.print_and_save_all_data('output/output_simulated_data_offline.xlsx')
+                
+                return True
+
+        return False
+    
     def step(self):
         '''
         Iterate the step
@@ -261,5 +299,73 @@ class NeuralNetworksModel():
         # Call the predicted inside measurements
         self.predicted_inside_measurements()
         
-        return self.observation()
+        return self.observation(), self.done()
+    
+    def evaluate_predictions(self):
+        '''
+        Evaluate the R² and MAE of the predicted vs actual values for `par_in`, `temp_in`, `rh_in`, and `co2_in`.
+        '''
         
+        # Extract actual values (entire series)
+        y_true_par_in = self.global_in
+        y_true_temp_in = self.temp_in
+        y_true_rh_in = self.rh_in
+        y_true_co2_in = self.co2_in
+
+        # Extract predicted values
+        y_pred_par_in = self.par_in_predicted.flatten()  
+        y_pred_temp_in = self.temp_in_predicted.flatten()  
+        y_pred_rh_in = self.rh_in_predicted.flatten()  
+        y_pred_co2_in = self.co2_in_predicted.flatten()  
+
+        # Calculate R² and MAE for each variable
+        r2_par_in = metrics.r2_score(y_true_par_in, y_pred_par_in)
+        r2_temp_in = metrics.r2_score(y_true_temp_in, y_pred_temp_in)
+        r2_rh_in = metrics.r2_score(y_true_rh_in, y_pred_rh_in)
+        r2_co2_in = metrics.r2_score(y_true_co2_in, y_pred_co2_in)
+        
+        r2_par_in_1 = self.r2_score_metric(y_true_par_in, y_pred_par_in)
+        r2_temp_in_1 = self.r2_score_metric(y_true_temp_in, y_pred_temp_in)
+        r2_rh_in_1 = self.r2_score_metric(y_true_rh_in, y_pred_rh_in)
+        r2_co2_in_1 = self.r2_score_metric(y_true_co2_in, y_pred_co2_in)
+
+        mae_par_in = metrics.mean_absolute_error(y_true_par_in, y_pred_par_in)
+        mae_temp_in = metrics.mean_absolute_error(y_true_temp_in, y_pred_temp_in)
+        mae_rh_in = metrics.mean_absolute_error(y_true_rh_in, y_pred_rh_in)
+        mae_co2_in = metrics.mean_absolute_error(y_true_co2_in, y_pred_co2_in)
+
+        # Print the results
+        print("Evaluation Results:")
+        print(f"PAR In: R² (metrics) = {r2_par_in:.4f}, R² (custom) = {r2_par_in_1:.4f}, MAE = {mae_par_in:.4f}")
+        print(f"Temperature In: R² (metrics) = {r2_temp_in:.4f}, R² (custom) = {r2_temp_in_1:.4f}, MAE = {mae_temp_in:.4f}")
+        print(f"Humidity In: R² (metrics) = {r2_rh_in:.4f}, R² (custom) = {r2_rh_in_1:.4f}, MAE = {mae_rh_in:.4f}")
+        print(f"CO2 In: R² (metrics) = {r2_co2_in:.4f}, R² (custom) = {r2_co2_in_1:.4f}, MAE = {mae_co2_in:.4f}")
+
+    def print_and_save_all_data(self, _file_name):
+        '''
+        Print all the appended data, export it to an Excel file, and plot the data.
+        '''
+        print("\n\n-------------------------------------------------------------------------------------")
+        print("Print all the appended data.")
+        print(f"Length of Time: {len(self.time)}")
+        print(f"Length of CO2 In: {len(self.co2_in)}")
+        print(f"Length of Temperature In: {len(self.temp_in)}")
+        print(f"Length of RH In: {len(self.rh_in)}")
+        print(f"Length of PAR In: {len(self.global_in)}")
+        print(f"Length of Predicted PAR In: {len(self.par_in_predicted)}")
+        print(f"Length of Predicted Temperature In: {len(self.temp_in_predicted)}")
+        print(f"Length of Predicted RH In: {len(self.rh_in_predicted)}")
+        print(f"Length of Predicted CO2 In: {len(self.co2_in_predicted)}")
+        
+        time_steps_formatted = range(0, self.season_length)
+        print("time_steps_formatted : ", len(time_steps_formatted))
+       
+        # Save all the data in an excel file
+        self.service_functions.export_to_excel_nn(_file_name, time_steps_formatted, self.co2_in, self.temp_in, self.rh_in,
+                             self.global_in, self.par_in_predicted[:, 0], self.temp_in_predicted[:, 0],
+                             self.rh_in_predicted[:, 0], self.co2_in_predicted[:, 0])
+
+        # Plot the data
+        self.service_functions.plot_all_data_nn(time_steps_formatted, self.co2_in, self.temp_in, self.rh_in,
+                           self.global_in, self.par_in_predicted[:, 0], self.temp_in_predicted[:, 0],
+                           self.rh_in_predicted[:, 0], self.co2_in_predicted[:, 0])

@@ -322,7 +322,7 @@ class CalibratorModel(gym.Env):
         new_co2_in_excel = self.step_data['co2 in'].values
         new_co2_out_excel = self.step_data['co2 out'].values
         
-        if self.flag_action_from_drl == True and _action_drl != None:
+        if self.flag_action_from_drl == True and _action_drl is not None:
             # Use the actions from the DRL model
             # Convert actions to discrete values
             ventilation = 1 if _action_drl[0] >= 0.5 else 0
@@ -334,14 +334,20 @@ class CalibratorModel(gym.Env):
             heater = np.full(4, heater)
 
             # Update the step_data with the DRL model's actions
-            self.step_data['toplights'] = toplights
-            self.step_data['ventilation'] = ventilation
-            self.step_data['heater'] = heater
+            # self.step_data['toplights'] = toplights
+            # self.step_data['ventilation'] = ventilation
+            # self.step_data['heater'] = heater
+            
+            # Update the step_data with the DRL model's actions using .loc
+            self.step_data.loc[:, 'toplights'] = toplights
+            self.step_data.loc[:, 'ventilation'] = ventilation
+            self.step_data.loc[:, 'heater'] = heater
             
             # Add new data
             new_toplights = self.step_data['toplights'].values
             new_ventilation = self.step_data['ventilation'].values
-            new_heater = self.step_data['heater'].values   
+            new_heater = self.step_data['heater'].values
+
         else:
             # Use the actions from the offline dataset and
             # add new data
@@ -640,8 +646,9 @@ class CalibratorModel(gym.Env):
         # Call the predicted inside measurements with the NN model
         self.predicted_inside_measurements_nn(_action_drl)
         
-        if self.flag_action_from_drl == True:
+        if self.flag_action_from_drl == True and _action_drl is not None:
             # Get the action from the DRL model 
+            print("DEBUG self.flag_action_from_drl from STEP")
             print("ACTION: ", _action_drl)
             
             # Convert actions to discrete values

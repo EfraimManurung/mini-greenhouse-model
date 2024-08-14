@@ -52,6 +52,7 @@ from utils.ServiceFunctions import ServiceFunctions
 from utils.ServiceFunctions import ServiceFunctions
 
 import tensorflow as tf
+tf.config.run_functions_eagerly(True)
 from tensorflow.keras.models import load_model
 import joblib
 import pandas as pd
@@ -79,7 +80,11 @@ class CalibratorModel(gym.Env):
         # Initialize if the main program for training or running
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
         self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
-        self.flag_action_from_drl = env_config.get("flag_action_from_drl", False) # Default is false, and we will use the action from offline datasets
+        self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
+        
+        self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
+        
+        self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         
         # or just only using offline datasets
         self.first_day_gl = env_config.get("first_day", 1) # The first day of the simulation
@@ -101,17 +106,19 @@ class CalibratorModel(gym.Env):
 
         # Path to MATLAB script
         # Change path based on your directory!
-        self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
-
-        # Load the datasets from separate files for the NN model
-        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
+        if self.flag_run_gl == True:
+            self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
         
-        # Load the dataset
-        self.mgh_data = pd.read_excel(file_path)
+        if self.flag_run_nn == True:
+            # Load the datasets from separate files for the NN model
+            file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
+            
+            # Load the dataset
+            self.mgh_data = pd.read_excel(file_path)
         
-        # Display the first few rows of the dataframe
-        print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
-        print(self.mgh_data.head())
+            # Display the first few rows of the dataframe
+            print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
+            print(self.mgh_data.head())
         
         # Initialize lists to store control values
         # if self.flag_action_from_drl == True:
@@ -153,11 +160,15 @@ class CalibratorModel(gym.Env):
         else:
             print(f"MATLAB script not found: {self.matlab_script_path}")
 
-        # Predict from the gl model
-        self.predicted_inside_measurements_gl()
-        
-        # Predict from the NN model
-        self.predicted_inside_measurements_nn(None)
+        if self.flag_run_gl == True:
+            # Predict from the gl model
+            self.predicted_inside_measurements_gl()
+            
+        if self.flag_run_nn == True:
+            
+            # Predict from the NN model
+            self.predicted_inside_measurements_nn(None)
+            self.season_length_nn += 4
         
         # Define the observation and action space
         self.define_spaces()
@@ -208,7 +219,7 @@ class CalibratorModel(gym.Env):
         
         # Need to be fixed
         features = ['time', 'global out', 'temp out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
-    
+
         # Ensure the data_input has the required features
         for feature in features:
             if feature not in data_input.columns:
@@ -229,7 +240,7 @@ class CalibratorModel(gym.Env):
         y_hat_measurements = loaded_model.predict(X_features_scaled)
         
         return y_hat_measurements
-    
+
     def define_spaces(self):
         '''
         Define the observation and action spaces.
@@ -322,7 +333,7 @@ class CalibratorModel(gym.Env):
         new_co2_in_excel = self.step_data['co2 in'].values
         new_co2_out_excel = self.step_data['co2 out'].values
         
-        if self.flag_action_from_drl == True and _action_drl is not None:
+        if self.action_from_drl == True and _action_drl is not None:
             # Use the actions from the DRL model
             # Convert actions to discrete values
             ventilation = 1 if _action_drl[0] >= 0.5 else 0
@@ -481,7 +492,7 @@ class CalibratorModel(gym.Env):
         int: The initial observation of the environment.
         '''
         self.current_step = 0
-        self.season_length_nn += 4
+        # self.season_length_nn += 4
         
         return self.observation(), {}
 
@@ -619,7 +630,7 @@ class CalibratorModel(gym.Env):
             
         return False
 
-    def step(self, _action_drl = None):
+    def step(self, _action_drl):
         '''
         Take an action in the environment.
         
@@ -643,12 +654,12 @@ class CalibratorModel(gym.Env):
         print("----------------------------------")
         print("CURRENT STEPS: ", self.current_step)
         
-        # Call the predicted inside measurements with the NN model
-        self.predicted_inside_measurements_nn(_action_drl)
+        if self.flag_run_nn == True:
+            # Call the predicted inside measurements with the NN model
+            self.predicted_inside_measurements_nn(_action_drl)
         
-        if self.flag_action_from_drl == True and _action_drl is not None:
+        if self.action_from_drl == True and _action_drl is not None:
             # Get the action from the DRL model 
-            print("DEBUG self.flag_action_from_drl from STEP")
             print("ACTION: ", _action_drl)
             
             # Convert actions to discrete values
@@ -751,9 +762,10 @@ class CalibratorModel(gym.Env):
         else:
             self.run_matlab_script(None, 'indoor.mat', 'fruit.mat')
         
-        # Load the updated data from predcited from the greenlight model
-        self.predicted_inside_measurements_gl()
-        
+        if self.flag_run_gl == True:
+            # Load the updated data from predcited from the greenlight model
+            self.predicted_inside_measurements_gl()
+            
         # Calculate reward
         # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the is the same)
         _reward = self.get_reward(ventilation[0], toplights[0], heater[0])

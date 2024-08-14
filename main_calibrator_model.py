@@ -6,7 +6,8 @@ calibrator_model = CalibratorModel({"flag_run": True,
                         "season_length_gl": 1/72,
                         "season_length_nn": 0, 
                         "online_measurements": False,
-                        "max_steps": 288
+                        "flag_action_from_drl": False,
+                        "max_steps": 6
                         })
 
 terminated = truncated = False

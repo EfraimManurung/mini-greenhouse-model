@@ -139,7 +139,51 @@ class ServiceFunctions:
         
         return vaporPres
 
-    def plot_all_data(self, time, co2_actual, temp_actual, rh_actual, par_actual, 
+    def plot_rewards_actions(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list):
+        '''
+        Plot the rewards and actions.
+
+        Parameters:
+        - filename: Name of the output Excel file
+        
+        - time: List of time values
+        
+        - ventilation_list: List of actions for ventilation from DRL model or offline datasets
+        - toplights_list: List of actions for toplights from DRL model or offline datasets
+        - heater_list: List of actions for heater from DRL model or offline datasets
+        
+        - reward_list: List of rewards for each iterated step
+        '''
+
+        # Create subplots with 2 rows and 2 columns
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12))
+
+        # Data to be plotted along with their titles
+        data = [
+            (ventilation_list, 'Ventilation Action [-]'),
+            (toplights_list, 'Toplights Action [-]'),
+            (heater_list, 'Heater Action [-]'),
+            (reward_list, 'Reward [-]')
+        ]
+
+        # Plot each dataset in a subplot
+        for ax, (y_data, title) in zip(axes.flatten(), data):
+            ax.plot(time, y_data, label=title, color='blue')  # Plot the data
+            
+            ax.set_title(title)  # Set the title for each subplot
+            ax.set_xlabel('Timesteps [- / 5 minutes]')  # Set the x-axis label
+            ax.set_ylabel(title)  # Set the y-axis label
+            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
+            ax.legend()  # Add legend to each subplot
+
+        # Adjust the layout to prevent overlap
+        plt.tight_layout()
+        plt.show()
+
+        # Save the plot to a file
+        fig.savefig(filename)
+    
+    def plot_all_data(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual, 
                   co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
                   co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
                   metrics_nn, metrics_gl):
@@ -169,7 +213,7 @@ class ServiceFunctions:
         '''
 
         # Create subplots with 2 rows and 2 columns
-        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12))
 
         # Data to be plotted along with their titles and predicted data
         data = [
@@ -196,38 +240,47 @@ class ServiceFunctions:
         # Adjust the layout to prevent overlap
         plt.tight_layout()
         plt.show()
+        
+        # Save the plot to a file
+        fig.savefig(filename)
 
-    def export_to_excel(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual,
+    def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
+                    co2_actual, temp_actual, rh_actual, par_actual,
                     co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
                     co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl):
         '''
         Export all the appended data to an Excel file including both actual and predicted values.
 
         Parameters:
-        - filename: Name of the output Excel file
-        - time: List of time values
+        - file_name: Name of the output Excel file
         
-        - co2_actual: List of actual CO2 values
-        - temp_actual: List of actual temperature values
-        - rh_actual: List of actual relative humidity values
-        - par_actual: List of actual PAR values
+        - ventilation_list: List of action for fan/ventilation from DRL model or offline datasets
+        - toplights_list: List of action for toplights from DRL model or offline datasets
+        - heater_list: List of action for heater from DRL model or offline datasets
+        - reward_list: List of reward for iterated step
         
-        - co2_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_predicted_nn: List of predicted PAR values from Neural Network
+        - co2_in_excel: List of actual CO2 values
+        - temp_in_excel: List of actual temperature values
+        - rh_in_excel: List of actual relative humidity values
+        - par_in_excel: List of actual PAR values
         
-        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
-        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
-        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
-        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        - co2_in_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_in_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_in_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_in_predicted_nn: List of predicted PAR values from Neural Network
         
-        - metrics_nn: Dictionary with R² and MAE for NN predictions
-        - metrics_gl: Dictionary with R² and MAE for GL predictions
+        - co2_in_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_in_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
 
         data = {
             'Timesteps [- / 5 minutes]': time,
+            'Action Ventilation': ventilation_list,
+            'Action Toplights': toplights_list,
+            'Action Heater': heater_list,
+            'Rewards': reward_list,
             'CO2 In (Actual)': co2_actual,
             'CO2 In (Predicted NN)': co2_predicted_nn,
             'CO2 In (Predicted GL)': co2_predicted_gl,

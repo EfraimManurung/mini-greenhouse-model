@@ -157,7 +157,7 @@ class CalibratorModel(gym.Env):
         self.predicted_inside_measurements_gl()
         
         # Predict from the NN model
-        self.predicted_inside_measurements_nn()
+        self.predicted_inside_measurements_nn(None)
         
         # Define the observation and action space
         self.define_spaces()
@@ -301,7 +301,7 @@ class CalibratorModel(gym.Env):
         
         self.eng.DrlGlEnvironment(self.season_length_gl, self.first_day_gl, 'controls.mat', outdoor_file, indoor_file, fruit_file, nargout=0)
 
-    def load_excel_data(self):
+    def load_excel_data(self, _action_drl):
         '''
         Load data from .xlsx file and store in instance variables.
         
@@ -321,9 +321,33 @@ class CalibratorModel(gym.Env):
         new_rh_out_excel = self.step_data['rh out'].values
         new_co2_in_excel = self.step_data['co2 in'].values
         new_co2_out_excel = self.step_data['co2 out'].values
-        new_toplights_excel = self.step_data['toplights'].values
-        new_ventilation_excel = self.step_data['ventilation'].values
-        new_heater_excel = self.step_data['heater'].values
+        
+        if self.flag_action_from_drl == True and _action_drl != None:
+            # Use the actions from the DRL model
+            # Convert actions to discrete values
+            ventilation = 1 if _action_drl[0] >= 0.5 else 0
+            toplights = 1 if _action_drl[1] >= 0.5 else 0
+            heater = 1 if _action_drl[2] >= 0.5 else 0
+            
+            ventilation = np.full(4, ventilation)
+            toplights = np.full(4, toplights)
+            heater = np.full(4, heater)
+
+            # Update the step_data with the DRL model's actions
+            self.step_data['toplights'] = toplights
+            self.step_data['ventilation'] = ventilation
+            self.step_data['heater'] = heater
+            
+            # Add new data
+            new_toplights = self.step_data['toplights'].values
+            new_ventilation = self.step_data['ventilation'].values
+            new_heater = self.step_data['heater'].values   
+        else:
+            # Use the actions from the offline dataset and
+            # add new data
+            new_toplights = self.step_data['toplights'].values
+            new_ventilation = self.step_data['ventilation'].values
+            new_heater = self.step_data['heater'].values
 
         # Check if instance variables already exist; if not, initialize them
         if not hasattr(self, 'time_excel'):
@@ -336,9 +360,9 @@ class CalibratorModel(gym.Env):
             self.rh_out_excel = new_rh_out_excel
             self.co2_in_excel = new_co2_in_excel
             self.co2_out_excel = new_co2_out_excel
-            self.toplights_excel = new_toplights_excel
-            self.ventilation_excel = new_ventilation_excel
-            self.heater_excel = new_heater_excel
+            self.toplights = new_toplights
+            self.ventilation = new_ventilation
+            self.heater = new_heater
         else:
             # Concatenate new data with existing data
             self.time_excel = np.concatenate((self.time_excel, new_time_excel))
@@ -350,17 +374,17 @@ class CalibratorModel(gym.Env):
             self.rh_out_excel = np.concatenate((self.rh_out_excel, new_rh_out_excel))
             self.co2_in_excel = np.concatenate((self.co2_in_excel, new_co2_in_excel))
             self.co2_out_excel = np.concatenate((self.co2_out_excel, new_co2_out_excel))
-            self.toplights_excel = np.concatenate((self.toplights_excel, new_toplights_excel))
-            self.ventilation_excel = np.concatenate((self.ventilation_excel, new_ventilation_excel))
-            self.heater_excel = np.concatenate((self.heater_excel, new_heater_excel))
+            self.toplights = np.concatenate((self.toplights, new_toplights))
+            self.ventilation = np.concatenate((self.ventilation, new_ventilation))
+            self.heater = np.concatenate((self.heater, new_heater))
     
-    def predicted_inside_measurements_nn(self):
+    def predicted_inside_measurements_nn(self, _action_drl):
         '''
         Predicted inside measurements
         
         '''
         # Load the updated data from the excel file
-        self.load_excel_data()
+        self.load_excel_data(_action_drl)
         
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
         new_par_in_predicted_nn = self.predict_inside_measurements('global in', self.step_data)
@@ -614,9 +638,10 @@ class CalibratorModel(gym.Env):
         print("CURRENT STEPS: ", self.current_step)
         
         # Call the predicted inside measurements with the NN model
-        self.predicted_inside_measurements_nn()
+        self.predicted_inside_measurements_nn(_action_drl)
         
         if self.flag_action_from_drl == True:
+            # Get the action from the DRL model 
             print("ACTION: ", _action_drl)
             
             # Convert actions to discrete values
@@ -630,12 +655,12 @@ class CalibratorModel(gym.Env):
             heater = np.full(4, heater)
 
         else:
-            # Get the actions from the excel file (offlien datasets)
+            # Get the actions from the excel file (offline datasets)
             time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-            ventilation = self.ventilation_excel[-4:]
-            toplights = self.toplights_excel[-4:]
-            heater = self.heater_excel[-4:]
-        
+            ventilation = self.ventilation[-4:]
+            toplights = self.toplights[-4:]
+            heater = self.heater[-4:]
+                                 
         print("CONVERTED ACTION")
         print("ventilation: ", ventilation)
         print("toplights: ", toplights)
@@ -736,30 +761,39 @@ class CalibratorModel(gym.Env):
     
     def print_and_save_all_data(self, file_name):
         '''
-        Print all the appended data and save to an Excel file.
+        Print all the appended data and save to an Excel file and plot it.
 
         Parameters:
         - file_name: Name of the output Excel file
         
-        - co2_actual: List of actual CO2 values
-        - temp_actual: List of actual temperature values
-        - rh_actual: List of actual relative humidity values
-        - par_actual: List of actual PAR values
+        - ventilation_list: List of action for fan/ventilation from DRL model or offline datasets
+        - toplights_list: List of action for toplights from DRL model or offline datasets
+        - heater_list: List of action for heater from DRL model or offline datasets
+        - reward_list: List of reward for iterated step
         
-        - co2_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_predicted_nn: List of predicted PAR values from Neural Network
+        - co2_in_excel: List of actual CO2 values
+        - temp_in_excel: List of actual temperature values
+        - rh_in_excel: List of actual relative humidity values
+        - par_in_excel: List of actual PAR values
         
-        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
-        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
-        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
-        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        - co2_in_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_in_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_in_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_in_predicted_nn: List of predicted PAR values from Neural Network
+        
+        - co2_in_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_in_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
         
         print("\n\n-------------------------------------------------------------------------------------")
         print("Print all the appended data.")
         print(f"Length of Time: {len(self.time_excel)}")
+        print(f"Length of Action Ventilation: {len(self.ventilation_list)}")
+        print(f"Length of Action Toplights: {len(self.toplights_list)}")
+        print(f"Length of Action Heater: {len(self.heater_list)}")
+        print(f"Length of reward: {len(self.rewards_list)}")
         print(f"Length of CO2 In (Actual): {len(self.co2_in_excel)}")
         print(f"Length of Temperature In (Actual): {len(self.temp_in_excel)}")
         print(f"Length of RH In (Actual): {len(self.rh_in_excel)}")
@@ -781,7 +815,7 @@ class CalibratorModel(gym.Env):
         
         # Save all the data in an Excel file
         self.service_functions.export_to_excel(
-            file_name, time_steps_formatted, 
+            file_name, time_steps_formatted, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl
@@ -789,12 +823,17 @@ class CalibratorModel(gym.Env):
 
         # Plot the data
         self.service_functions.plot_all_data(
-            time_steps_formatted, 
+            'output/output_all_data.png', time_steps_formatted, 
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
             metrics_nn, metrics_gl
         )
+        
+        # Plot the rewards and actions
+        self.service_functions.plot_rewards_actions('output/output_rewards_action.png', time_steps_formatted, self.ventilation_list, self.toplights_list, 
+                                                    self.heater_list, self.rewards_list)
+
 
     def evaluate_predictions(self):
         '''

@@ -156,7 +156,7 @@ class ServiceFunctions:
         '''
 
         # Create subplots with 2 rows and 2 columns
-        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12))
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 12))
 
         # Data to be plotted along with their titles
         data = [
@@ -186,7 +186,8 @@ class ServiceFunctions:
     def plot_all_data(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual, 
                   co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
                   co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
-                  metrics_nn, metrics_gl):
+                  co2_combined, temp_combined, rh_combined, par_combined,
+                  metrics_nn, metrics_gl, metrics_combined):
         '''
         Plot all the parameters to make it easier to compare predicted vs actual values.
 
@@ -208,29 +209,38 @@ class ServiceFunctions:
         - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
         - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
         
+        - co2_combined: List of combined CO2 predictions
+        - temp_combined: List of combined temperature predictions
+        - rh_combined: List of combined relative humidity predictions
+        - par_combined: List of combined PAR predictions
+        
         - metrics_nn: Dictionary with R² and MAE for NN predictions
         - metrics_gl: Dictionary with R² and MAE for GL predictions
+        - metrics_combined: Dictionary with R² and MAE for Combined predictions
         '''
 
         # Create subplots with 2 rows and 2 columns
-        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12))
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 12))
 
         # Data to be plotted along with their titles and predicted data
         data = [
-            (co2_actual, co2_predicted_nn, co2_predicted_gl, 'CO2 In [ppm]', metrics_nn['CO2'], metrics_gl['CO2']),
-            (temp_actual, temp_predicted_nn, temp_predicted_gl, 'Temperature In [°C]', metrics_nn['Temperature'], metrics_gl['Temperature']),
-            (rh_actual, rh_predicted_nn, rh_predicted_gl, 'RH In [%]', metrics_nn['Humidity'], metrics_gl['Humidity']),
-            (par_actual, par_predicted_nn, par_predicted_gl, 'PAR In [W/m2]', metrics_nn['PAR'], metrics_gl['PAR'])
+            (co2_actual, co2_predicted_nn, co2_predicted_gl, co2_combined, 'CO2 In [ppm]', metrics_nn['CO2'], metrics_gl['CO2'], metrics_combined['CO2']),
+            (temp_actual, temp_predicted_nn, temp_predicted_gl, temp_combined, 'Temperature In [°C]', metrics_nn['Temperature'], metrics_gl['Temperature'], metrics_combined['Temperature']),
+            (rh_actual, rh_predicted_nn, rh_predicted_gl, rh_combined, 'RH In [%]', metrics_nn['Humidity'], metrics_gl['Humidity'], metrics_combined['Humidity']),
+            (par_actual, par_predicted_nn, par_predicted_gl, par_combined, 'PAR In [W/m2]', metrics_nn['PAR'], metrics_gl['PAR'], metrics_combined['PAR'])
         ]
 
         # Plot each dataset in a subplot
-        for ax, (y_actual, y_pred_nn, y_pred_gl, title, metrics_nn, metrics_gl) in zip(axes.flatten(), data):
+        for ax, (y_actual, y_pred_nn, y_pred_gl, y_combined, title, metrics_nn, metrics_gl, metrics_combined) in zip(axes.flatten(), data):
             ax.plot(time, y_actual, label='Actual', color='blue')  # Plot actual data
-            ax.plot(time, y_pred_nn, label='Predicted NN', color='red', linestyle='--')  # Plot NN predicted data
+            ax.plot(time, y_pred_nn, label='Predicted NN', color='purple', linestyle='--')  # Plot NN predicted data
             ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')  # Plot GL predicted data
+            ax.plot(time, y_combined, label='Predicted Combined', color='red', linestyle='-.')  # Plot combined predicted data
             
             # Add R² and MAE to the title
-            ax.set_title(f"{title}\nNN R²: {metrics_nn[0]:.4f}, MAE: {metrics_nn[1]:.4f}\nGL R²: {metrics_gl[0]:.4f}, MAE: {metrics_gl[1]:.4f}")
+            ax.set_title(f"{title}\nNN R²: {metrics_nn[0]:.4f}, MAE: {metrics_nn[1]:.4f}\n"
+                        f"GL R²: {metrics_gl[0]:.4f}, MAE: {metrics_gl[1]:.4f}\n"
+                        f"Combined R²: {metrics_combined[0]:.4f}, MAE: {metrics_combined[1]:.4f}")
             
             ax.set_xlabel('Timesteps [- / 5 minutes]')  # Set the x-axis label
             ax.set_ylabel(title)  # Set the y-axis label
@@ -247,7 +257,8 @@ class ServiceFunctions:
     def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
                     co2_actual, temp_actual, rh_actual, par_actual,
                     co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
-                    co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl):
+                    co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
+                    co2_predicted_combined, temp_predicted_combined, rh_predicted_combined, par_predicted_combined):
         '''
         Export all the appended data to an Excel file including both actual and predicted values.
 
@@ -273,6 +284,11 @@ class ServiceFunctions:
         - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
         - rh_in_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
         - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        
+        - co2_predicted_combined: List of combined predicted CO2 values
+        - temp_predicted_combined: List of combined predicted temperature values
+        - rh_predicted_combined: List of combined predicted relative humidity values
+        - par_predicted_combined: List of combined predicted PAR values
         '''
 
         data = {
@@ -284,15 +300,19 @@ class ServiceFunctions:
             'CO2 In (Actual)': co2_actual,
             'CO2 In (Predicted NN)': co2_predicted_nn,
             'CO2 In (Predicted GL)': co2_predicted_gl,
+            'CO2 In (Predicted Combined)': co2_predicted_combined,
             'Temperature In (Actual)': temp_actual,
             'Temperature In (Predicted NN)': temp_predicted_nn,
             'Temperature In (Predicted GL)': temp_predicted_gl,
+            'Temperature In (Predicted Combined)': temp_predicted_combined,
             'RH In (Actual)': rh_actual,
             'RH In (Predicted NN)': rh_predicted_nn,
             'RH In (Predicted GL)': rh_predicted_gl,
+            'RH In (Predicted Combined)': rh_predicted_combined,
             'PAR In (Actual)': par_actual,
             'PAR In (Predicted NN)': par_predicted_nn,
             'PAR In (Predicted GL)': par_predicted_gl,
+            'PAR In (Predicted Combined)': par_predicted_combined,
         }
 
         # Check if all lists have the same length

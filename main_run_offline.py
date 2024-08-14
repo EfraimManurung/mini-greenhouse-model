@@ -9,7 +9,7 @@ calibrator_model = CalibratorModel({"flag_run": True,
                         "action_from_drl": False,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
-                        "max_steps": 3
+                        "max_steps": 72 * 4
                         })
 
 terminated = truncated = False

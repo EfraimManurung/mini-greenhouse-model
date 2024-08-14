@@ -825,19 +825,23 @@ class CalibratorModel(gym.Env):
         print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
         print(f"Length of Predicted PAR In (GL): {len(self.PAR_in_predicted_gl)}")
-
+        
         time_steps_formatted = range(0, self.season_length_nn)
         print("Time Steps Formatted: ", time_steps_formatted)
+
+        # Combine predictions
+        self.combine_model_predictions(w_gl=0.5, w_nn=0.5)
         
         # Evaluate predictions to get R² and MAE metrics
-        metrics_nn, metrics_gl = self.evaluate_predictions()
+        metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
         
         # Save all the data in an Excel file
         self.service_functions.export_to_excel(
             file_name, time_steps_formatted, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl
+            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
+            self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models
         )
 
         # Plot the data
@@ -846,13 +850,13 @@ class CalibratorModel(gym.Env):
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
-            metrics_nn, metrics_gl
+            self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models,
+            metrics_nn, metrics_gl, metrics_combined
         )
         
         # Plot the rewards and actions
         self.service_functions.plot_rewards_actions('output/output_rewards_action.png', time_steps_formatted, self.ventilation_list, self.toplights_list, 
                                                     self.heater_list, self.rewards_list)
-
 
     def evaluate_predictions(self):
         '''
@@ -876,6 +880,12 @@ class CalibratorModel(gym.Env):
         y_pred_rh_in_gl = self.rh_in_predicted_gl
         y_pred_co2_in_gl = self.co2_in_predicted_gl
 
+        # Extract combined model predictions
+        y_pred_par_in_combined = self.par_in_combined_models
+        y_pred_temp_in_combined = self.temp_in_combined_models
+        y_pred_rh_in_combined = self.rh_in_combined_models
+        y_pred_co2_in_combined = self.co2_in_combined_models
+
         # Calculate R² and MAE for each variable
         def calculate_metrics(y_true, y_pred):
             r2 = metrics.r2_score(y_true, y_pred)
@@ -896,15 +906,51 @@ class CalibratorModel(gym.Env):
             'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_gl)
         }
 
+        metrics_combined = {
+            'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_combined),
+            'Temperature': calculate_metrics(y_true_temp_in, y_pred_temp_in_combined),
+            'Humidity': calculate_metrics(y_true_rh_in, y_pred_rh_in_combined),
+            'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_combined)
+        }
+
         # Print the results
         print("Evaluation Results:")
         for variable in ['PAR', 'Temperature', 'Humidity', 'CO2']:
             r2_nn, mae_nn = metrics_nn[variable]
             r2_gl, mae_gl = metrics_gl[variable]
+            r2_combined, mae_combined = metrics_combined[variable]
             print(f"{variable} (NN): R² = {r2_nn:.4f}, MAE = {mae_nn:.4f}")
             print(f"{variable} (GL): R² = {r2_gl:.4f}, MAE = {mae_gl:.4f}")
+            print(f"{variable} (Combined): R² = {r2_combined:.4f}, MAE = {mae_combined:.4f}")
 
-        return metrics_nn, metrics_gl
+        return metrics_nn, metrics_gl, metrics_combined
+    
+    def combine_model_predictions(self, w_gl=0.5, w_nn=0.5):
+        """
+        Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL).
+
+        Parameters:
+        - w_gl: Weight for the GL model prediction.
+        - w_nn: Weight for the NN model prediction.
+        
+        The sum of w_gl and w_nn should be 1.0.
+        
+        This method updates the following attributes:
+        - self.co2_in_combined_models
+        - self.temp_in_combined_models
+        - self.rh_in_combined_models
+        - self.par_in_combined_models
+        """
+        
+        # Ensure the weights sum to 1.0
+        if w_gl + w_nn != 1.0:
+            raise ValueError("The sum of w_gl and w_nn should be 1.0.")
+        
+        # Combine predictions
+        self.co2_in_combined_models = w_gl * self.co2_in_predicted_gl + w_nn * self.co2_in_predicted_nn[:, 0]
+        self.temp_in_combined_models = w_gl * self.temp_in_predicted_gl + w_nn * self.temp_in_predicted_nn[:, 0]
+        self.rh_in_combined_models = w_gl * self.rh_in_predicted_gl + w_nn * self.rh_in_predicted_nn[:, 0]
+        self.par_in_combined_models = w_gl * self.PAR_in_predicted_gl + w_nn * self.par_in_predicted_nn[:, 0]
 
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

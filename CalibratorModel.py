@@ -87,7 +87,7 @@ class CalibratorModel(gym.Env):
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         
         # or just only using offline datasets
-        self.first_day_gl = env_config.get("first_day", 1) # The first day of the simulation
+        self.first_day_gl = env_config.get("first_day_gl", 1) # The first day of the simulation
         
         # Define the season length parameter
         # 20 minutes
@@ -96,7 +96,7 @@ class CalibratorModel(gym.Env):
         # The calculation look like this:
         # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
         self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
-        self.season_length_nn = env_config.get("season_length_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
+        self.season_length_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 4) # How many iteration the program run

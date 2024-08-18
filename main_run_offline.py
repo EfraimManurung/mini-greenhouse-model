@@ -9,7 +9,7 @@ calibrator_model = CalibratorModel({"flag_run": True,
                         "action_from_drl": False,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
-                        "max_steps": 36 #72 * 1 # 3 steps = 1 hour or 1 episode, so 24 hours = 24 * 3 = 72 steps, 72 steps (24 hours) * day
+                        "max_steps": 72 * 2 # 3 steps = 1 hour or 1 episode, so 24 hours = 24 * 3 = 72 steps, 72 steps (24 hours) * day
                         })
 
 terminated = truncated = False

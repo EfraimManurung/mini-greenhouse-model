@@ -54,6 +54,8 @@ from utils.ServiceFunctions import ServiceFunctions
 import tensorflow as tf
 tf.config.run_functions_eagerly(True)
 from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, GRU, Dense, Multiply, Add, Layer
 import joblib
 import pandas as pd
 import numpy as np
@@ -455,7 +457,7 @@ class CalibratorModel(gym.Env):
         new_co2_in_predicted_gl = data['co2_in'].flatten()[-4:]
         new_temp_in_predicted_gl = data['temp_in'].flatten()[-4:]
         new_rh_in_predicted_gl = data['rh_in'].flatten()[-4:]
-        new_PAR_in_predicted_gl = data['PAR_in'].flatten()[-4:]
+        new_par_in_predicted_gl = data['PAR_in'].flatten()[-4:]
         new_fruit_leaf_predicted_gl = data['fruit_leaf'].flatten()[-4:]
         new_fruit_stem_predicted_gl = data['fruit_stem'].flatten()[-4:]
         new_fruit_dw_predicted_gl = data['fruit_dw'].flatten()[-4:]
@@ -467,7 +469,7 @@ class CalibratorModel(gym.Env):
             self.co2_in_predicted_gl = new_co2_in_predicted_gl
             self.temp_in_predicted_gl = new_temp_in_predicted_gl
             self.rh_in_predicted_gl = new_rh_in_predicted_gl
-            self.PAR_in_predicted_gl = new_PAR_in_predicted_gl
+            self.par_in_predicted_gl = new_par_in_predicted_gl
             self.fruit_leaf_predicted_gl = new_fruit_leaf_predicted_gl
             self.fruit_stem_predicted_gl = new_fruit_stem_predicted_gl
             self.fruit_dw_predicted_gl = new_fruit_dw_predicted_gl
@@ -478,7 +480,7 @@ class CalibratorModel(gym.Env):
             self.co2_in_predicted_gl = np.concatenate((self.co2_in_predicted_gl, new_co2_in_predicted_gl))
             self.temp_in_predicted_gl = np.concatenate((self.temp_in_predicted_gl, new_temp_in_predicted_gl))
             self.rh_in_predicted_gl= np.concatenate((self.rh_in_predicted_gl, new_rh_in_predicted_gl))
-            self.PAR_in_predicted_gl = np.concatenate((self.PAR_in_predicted_gl, new_PAR_in_predicted_gl))
+            self.par_in_predicted_gl = np.concatenate((self.par_in_predicted_gl, new_par_in_predicted_gl))
             self.fruit_leaf_predicted_gl = np.concatenate((self.fruit_leaf_predicted_gl, new_fruit_leaf_predicted_gl))
             self.fruit_stem_predicted_gl = np.concatenate((self.fruit_stem_predicted_gl, new_fruit_stem_predicted_gl))
             self.fruit_dw_predicted_gl = np.concatenate((self.fruit_dw_predicted_gl, new_fruit_dw_predicted_gl))
@@ -526,7 +528,7 @@ class CalibratorModel(gym.Env):
             self.co2_in_predicted_gl[-1],
             self.temp_in_predicted_gl[-1],
             self.rh_in_predicted_gl[-1],
-            self.PAR_in_predicted_gl[-1],
+            self.par_in_predicted_gl[-1],
             self.fruit_leaf_predicted_gl[-1],
             self.fruit_stem_predicted_gl[-1],
             self.fruit_dw_predicted_gl[-1],
@@ -807,6 +809,26 @@ class CalibratorModel(gym.Env):
         - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
         
+        # Ensure all lists and arrays are 1D
+        # def ensure_1d(arr):
+        #     return arr.reshape(-1) if arr.ndim > 1 else arr
+
+        # # Flatten the arrays with shape (16, 1) to (16,)
+        # self.co2_in_combined_models = ensure_1d(self.co2_in_combined_models)
+        # self.temp_in_combined_models = ensure_1d(self.temp_in_combined_models)
+        # self.rh_in_combined_models = ensure_1d(self.rh_in_combined_models)
+        # self.par_in_combined_models = ensure_1d(self.par_in_combined_models)
+        
+        # self.co2_in_combined_models = self.co2_in_combined_models[:, 0]
+        # self.temp_in_combined_models = self.temp_in_combined_models[:, 0]
+        # self.rh_in_combined_models = self.rh_in_combined_models[:, 0]
+        # self.par_in_combined_models = self.par_in_combined_models[:, 0]
+        
+        # self.co2_in_combined_models = self.co2_in_combined_models.flatten()
+        # self.temp_in_combined_models = self.temp_in_combined_models.flatten()
+        # self.rh_in_combined_models = self.rh_in_combined_models.flatten()
+        # self.par_in_combined_models = self.par_in_combined_models.flatten()
+        
         print("\n\n-------------------------------------------------------------------------------------")
         print("Print all the appended data.")
         print(f"Length of Time: {len(self.time_excel)}")
@@ -825,14 +847,16 @@ class CalibratorModel(gym.Env):
         print(f"Length of Predicted CO2 In (GL): {len(self.co2_in_predicted_gl)}")
         print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
-        print(f"Length of Predicted PAR In (GL): {len(self.PAR_in_predicted_gl)}")
+        print(f"Length of Predicted PAR In (GL): {len(self.par_in_predicted_gl)}")
         
         # time_steps_formatted = range(0, self.season_length_nn)
         time_steps_formatted = range(0, int(self.season_length_nn - self.first_day_nn))
         print("Time Steps Formatted: ", time_steps_formatted)
 
+        time_steps_formatted_2 = list(range(0, int(self.season_length_nn - self.first_day_nn)))
+
         # Combine predictions
-        self.combine_model_predictions(w_gl=0.5, w_nn=0.5)
+        self.predicted_combined_model(time_steps_formatted_2)
         
         # Evaluate predictions to get R² and MAE metrics
         metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
@@ -842,7 +866,7 @@ class CalibratorModel(gym.Env):
             file_name, time_steps_formatted, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
+            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
             self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models
         )
 
@@ -851,7 +875,7 @@ class CalibratorModel(gym.Env):
             'output/output_all_data.png', time_steps_formatted, 
             self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.PAR_in_predicted_gl,
+            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
             self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models,
             metrics_nn, metrics_gl, metrics_combined
         )
@@ -877,7 +901,7 @@ class CalibratorModel(gym.Env):
         y_pred_rh_in_nn = self.rh_in_predicted_nn[:, 0]
         y_pred_co2_in_nn = self.co2_in_predicted_nn[:, 0]
         
-        y_pred_par_in_gl = self.PAR_in_predicted_gl
+        y_pred_par_in_gl = self.par_in_predicted_gl
         y_pred_temp_in_gl = self.temp_in_predicted_gl
         y_pred_rh_in_gl = self.rh_in_predicted_gl
         y_pred_co2_in_gl = self.co2_in_predicted_gl
@@ -927,32 +951,129 @@ class CalibratorModel(gym.Env):
 
         return metrics_nn, metrics_gl, metrics_combined
     
-    def combine_model_predictions(self, w_gl=0.5, w_nn=0.5):
-        """
-        Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL).
-
+    def predict_inside_measurements_gru(self, target_variable, data_input):
+        '''
+        Predict the measurements or state variables inside mini-greenhouse using a GRU model to combine both of 
+        the GL and NN models.
+        
         Parameters:
-        - w_gl: Weight for the GL model prediction.
-        - w_nn: Weight for the NN model prediction.
+        target_variable: str - The target variable to predict.
+        data_input: dict or pd.DataFrame - The input features for the prediction.
+
+        Features (inputs):
+            - timesteps
+            - {target_variable} (Predicted GL)
+            - {target_variable} (Predicted NN)
         
-        The sum of w_gl and w_nn should be 1.0.
+        Return: 
+        np.array: predicted measurements inside mini-greenhouse
+        '''
+        # Custom Layer to subtract from 1
+        class SubtractFromOne(Layer):
+            def call(self, inputs):
+                return 1.0 - inputs
+
+        # Custom Layer to extract a specific feature (replacing Lambda layers that slice inputs)
+        class ExtractFeature(Layer):
+            def __init__(self, index, **kwargs):
+                super(ExtractFeature, self).__init__(**kwargs)
+                self.index = index
+
+            def call(self, inputs):
+                return inputs[:, :, self.index]
         
+        if isinstance(data_input, dict):
+            data_input = pd.DataFrame(data_input)
+        
+         # Features required for the GRU model
+        features = ['timesteps', f'{target_variable} (Predicted GL)', f'{target_variable} (Predicted NN)']
+
+        # Ensure the data_input has the required features
+        for feature in features:
+            if feature not in data_input.columns:
+                raise ValueError(f"Missing feature '{feature}' in the input data.")
+        
+        X_features = data_input[features]
+        
+        # Extract the underlying NumPy array and reshape
+        X_features_values = X_features.values
+        X_features_reshaped = X_features_values.reshape((X_features_values.shape[0], -1, X_features_values.shape[1]))
+        
+        # Load the GRU model
+        with open(f"gru-models/{target_variable.replace(' ', '_')}_gru_model.json", "r") as json_file:
+            loaded_model_json = json_file.read()
+            loaded_model = tf.keras.models.model_from_json(
+                loaded_model_json,
+                custom_objects={
+                    'r2_score_metric': self.r2_score_metric,
+                    'SubtractFromOne': SubtractFromOne,
+                    'ExtractFeature': ExtractFeature
+                }
+            )
+        
+        # Load the model weights
+        loaded_model.load_weights(f"gru-models/{target_variable.replace(' ', '_')}_gru_model.weights.h5")
+        
+        # Compile the loaded model
+        loaded_model.compile(optimizer='adam', loss='mse', metrics=['mae', self.r2_score_metric])
+        
+        # Predict the measurements
+        y_hat_measurements = loaded_model.predict(X_features_reshaped)
+        
+        # Flatten it
+        y_hat_measurements_1d = y_hat_measurements.flatten()
+        
+        return y_hat_measurements_1d
+    
+    def predicted_combined_model(self, _timesteps):
+        """
+        Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL), 
+        and include predictions from the GRU model for all variables.
+            
         This method updates the following attributes:
         - self.co2_in_combined_models
         - self.temp_in_combined_models
         - self.rh_in_combined_models
         - self.par_in_combined_models
         """
+
+        # Print shapes of the arrays to debug
+        print("Shapes of input arrays:")
+        print(f"timesteps: {len(_timesteps)}")
+        print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
+        print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
+        print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
+        print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
+        print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
+        print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
+        print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
+        print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
+
+        # Create data_input for GRU prediction
+        data_input = pd.DataFrame({
+            'timesteps': _timesteps,
+            'CO2 In (Predicted GL)': self.co2_in_predicted_gl.flatten(),
+            'CO2 In (Predicted NN)': self.co2_in_predicted_nn[:, 0],
+            'Temperature In (Predicted GL)': self.temp_in_predicted_gl.flatten(),
+            'Temperature In (Predicted NN)': self.temp_in_predicted_nn[:, 0],
+            'RH In (Predicted GL)': self.rh_in_predicted_gl.flatten(),
+            'RH In (Predicted NN)': self.rh_in_predicted_nn[:, 0],
+            'PAR In (Predicted GL)': self.par_in_predicted_gl.flatten(),
+            'PAR In (Predicted NN)': self.par_in_predicted_nn[:, 0]
+        })
         
-        # Ensure the weights sum to 1.0
-        if w_gl + w_nn != 1.0:
-            raise ValueError("The sum of w_gl and w_nn should be 1.0.")
+        print("DATA INPUT!!! : \n", data_input)
+
+        # Predict measurements using GRU model
+        self.co2_in_combined_models = self.predict_inside_measurements_gru("CO2 In", data_input)
+        self.temp_in_combined_models = self.predict_inside_measurements_gru("Temperature In", data_input)
+        self.rh_in_combined_models = self.predict_inside_measurements_gru("RH In", data_input)
+        self.par_in_combined_models = self.predict_inside_measurements_gru("PAR In", data_input)
         
-        # Combine predictions
-        self.co2_in_combined_models = w_gl * self.co2_in_predicted_gl + w_nn * self.co2_in_predicted_nn[:, 0]
-        self.temp_in_combined_models = w_gl * self.temp_in_predicted_gl + w_nn * self.temp_in_predicted_nn[:, 0]
-        self.rh_in_combined_models = w_gl * self.rh_in_predicted_gl + w_nn * self.rh_in_predicted_nn[:, 0]
-        self.par_in_combined_models = w_gl * self.PAR_in_predicted_gl + w_nn * self.par_in_predicted_nn[:, 0]
+        print(f"Shape of co2_in_predicted_nn: {self.co2_in_predicted_nn.shape}")
+        print(f"Shape of temp_in_predicted_nn: {self.temp_in_predicted_nn.shape}")
+        print(f"Shape of rh_in_predicted_nn: {self.rh_in_predicted_nn.shape}")
+        print(f"Shape of par_in_predicted_nn: {self.par_in_predicted_nn.shape}")
 
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

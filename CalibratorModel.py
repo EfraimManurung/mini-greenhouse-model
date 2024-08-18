@@ -96,7 +96,8 @@ class CalibratorModel(gym.Env):
         # The calculation look like this:
         # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
         self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
-        self.season_length_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
+        self.first_day_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
+        self.season_length_nn = self.first_day_nn 
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 4) # How many iteration the program run
@@ -826,7 +827,8 @@ class CalibratorModel(gym.Env):
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
         print(f"Length of Predicted PAR In (GL): {len(self.PAR_in_predicted_gl)}")
         
-        time_steps_formatted = range(0, self.season_length_nn)
+        # time_steps_formatted = range(0, self.season_length_nn)
+        time_steps_formatted = range(0, int(self.season_length_nn - self.first_day_nn))
         print("Time Steps Formatted: ", time_steps_formatted)
 
         # Combine predictions

@@ -42,7 +42,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     else
             %Load outdoor measurements from the .mat file
             outdoor_file = load(outdoorFile);
-            outdoor_drl = [outdoor_file.time, outdoor_file.lux, outdoor_file.temperature, outdoor_file.humidity, outdoor_file.co2];
+            outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];
         
              % Function inputs:
             %   lampType        Type of lamps in the greenhouse. Choose between 

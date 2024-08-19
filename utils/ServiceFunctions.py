@@ -377,7 +377,7 @@ class ServiceFunctions:
         self.client_pub.connect(broker, port, 60)
         self.client_pub.loop_start()
 
-    def get_outdoor_measurements(self, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/outdoor-measurements"):
+    def get_outdoor_indoor_measurements(self, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements"):
         '''
         Initialize outdoor measurements.
         
@@ -401,7 +401,10 @@ class ServiceFunctions:
             
             # Process the received data
             # Change the matlab file in here
-            self.process_received_data(data) 
+            # self.process_received_data(data) 
+            
+            # Process the received data and return it
+            self.outdoor_measurements_1 = self.process_received_data(data)
         
             # Set the flag to indicate a message was received
             self.message_received = True
@@ -420,7 +423,8 @@ class ServiceFunctions:
         
         self.client_sub.loop_stop()  # Ensure the loop is stopped
         self.client_sub.disconnect()  # Disconnect the client
-        return True
+        
+        return self.outdoor_measurements_1 # Return the processed
 
     def process_received_data(self, data):
         '''
@@ -436,26 +440,49 @@ class ServiceFunctions:
         
         # Extract variables
         time = data.get("time", [])
-        lux = data.get("lux", [])
-        temp = data.get("temperature", [])
-        hum = data.get("humidity", [])
-        co2 = data.get("co2", [])
+        par_out = data.get("par_out", [])
+        temp_out = data.get("temp_out", [])
+        hum_out = data.get("hum_out", [])
+        co2_out = data.get("co2_out", [])
+        par_in = data.get("par_in", [])
+        temp_in = data.get("temp_in", [])
+        hum_in = data.get("hum_in", [])
+        co2_in= data.get("co2_in", [])
         
         # Print the extracted variables
         print("Time:", time)
-        print("Lux:", lux)
-        print("Temperature:", temp)
-        print("Humidity:", hum)
-        print("CO2:", co2)
+        print("PAR Out:", par_out)
+        print("Temperature Out:", temp_out)
+        print("Humidity Out:", hum_out)
+        print("CO2 Out:", co2_out)
+        print("PAR In:", par_in)
+        print("Temperature In:", temp_in)
+        print("Humidity In:", hum_in)
+        print("CO2 In:", co2_in)
         
         # Create outdoor measurements dictionary
         outdoor_measurements = {
             'time': np.array(time).reshape(-1, 1),
-            'lux': np.array(lux).reshape(-1, 1),
-            'temperature': np.array(temp).reshape(-1, 1),
-            'humidity': np.array(hum).reshape(-1, 1),
-            'co2': np.array(co2).reshape(-1, 1)
+            'par_out': np.array(par_out).reshape(-1, 1),
+            'temp_out': np.array(temp_out).reshape(-1, 1),
+            'hum_out': np.array(hum_out).reshape(-1, 1),
+            'co2_out': np.array(co2_out).reshape(-1, 1),
+        }
+        
+        # Create outdoor measurements dictionary
+        outdoor_indoor_measurements = {
+            'time': np.array(time).reshape(-1, 1),
+            'par_out': np.array(par_out).reshape(-1, 1),
+            'temp_out': np.array(temp_out).reshape(-1, 1),
+            'hum_out': np.array(hum_out).reshape(-1, 1),
+            'co2_out': np.array(co2_out).reshape(-1, 1),
+            'par_in': np.array(par_in).reshape(-1, 1),
+            'temp_in': np.array(temp_in).reshape(-1, 1),
+            'hum_in': np.array(hum_in).reshape(-1, 1),
+            'co2_in': np.array(co2_in).reshape(-1, 1)
         }
         
         # Save outdoor measurements to .mat file
         sio.savemat('outdoor.mat', outdoor_measurements)
+        
+        return outdoor_indoor_measurements

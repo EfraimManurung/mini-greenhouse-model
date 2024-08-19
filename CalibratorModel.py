@@ -48,9 +48,7 @@ import matlab.engine
 # Import service functions
 from utils.ServiceFunctions import ServiceFunctions
 
-# IMPORT LIBRARIES for NN model
-from utils.ServiceFunctions import ServiceFunctions
-
+# IMPORT LIBRARIES for NN and GRU models
 import tensorflow as tf
 tf.config.run_functions_eagerly(True)
 from tensorflow.keras.models import load_model
@@ -60,7 +58,6 @@ import joblib
 import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
-
 
 class CalibratorModel(gym.Env):
     '''
@@ -108,9 +105,7 @@ class CalibratorModel(gym.Env):
         self.eng = matlab.engine.start_matlab()
 
         # Path to MATLAB script
-        # Change path based on your directory!
         if self.flag_run_gl == True:
-            #self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
             self.matlab_script_path = r'matlab\DrlGlEnvironment.m'
         
         if self.flag_run_nn == True:
@@ -125,7 +120,6 @@ class CalibratorModel(gym.Env):
             print(self.mgh_data.head())
         
         # Initialize lists to store control values
-        # if self.flag_action_from_drl == True:
         self.ventilation_list = []
         self.toplights_list = []
         self.heater_list = []
@@ -145,15 +139,13 @@ class CalibratorModel(gym.Env):
         # Check if MATLAB script exists
         if os.path.isfile(self.matlab_script_path):
             
-            # Initialize lists to store control values
-            #if self.flag_action_from_drl == True:
-            # Initialize control variables to zero 
+            # Initialize lists to store control values and initialize control variables to zero 
             self.init_controls()
             
             # Call the MATLAB function 
             if self.online_measurements == True:
                 # Initialize outdoor measurements, to get the outdoor measurements
-                self.service_functions.get_outdoor_measurements()
+                self.service_functions.get_outdoor_indoor_measurements()
                 
                 # Run the script with the updated outdoor measurements for the first time
                 self.run_matlab_script('outdoor.mat', None, None)
@@ -234,7 +226,7 @@ class CalibratorModel(gym.Env):
         # Load the model using the native Keras format
         loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
         
-        # Load the scalerc:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\main_run.py
+        # Load the scaler
         scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
             
         # Scale the input features
@@ -243,6 +235,7 @@ class CalibratorModel(gym.Env):
         # Predict the measurements
         y_hat_measurements = loaded_model.predict(X_features_scaled)
         
+        # Return the predicted measurements inside the mini-greenhouse
         return y_hat_measurements
 
     def define_spaces(self):
@@ -316,88 +309,173 @@ class CalibratorModel(gym.Env):
         
         self.eng.DrlGlEnvironment(self.season_length_gl, self.first_day_gl, 'controls.mat', outdoor_file, indoor_file, fruit_file, nargout=0)
 
-    def load_excel_data(self, _action_drl):
+    def load_excel_or_mqtt_data(self, _action_drl):
         '''
-        Load data from .xlsx file and store in instance variables.
+        Load data from .xlsx file or mqtt data and store in instance variables.
         
         The data is appended to existing variables if they already exist.
         '''
 
-        # Slice the dataframe to get the rows for the current step
-        self.step_data = self.mgh_data.iloc[self.season_length_nn:self.season_length_nn + 4]
+        if self.online_measurements == True:
+            print("Self online measurements True load excel or mqtt data")
+            
+            # Initialize outdoor measurements, to get the outdoor measurements
+            outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements()
+            
+            # Convert outdoor_indoor_measurements to a DataFrame
+            self.step_data = pd.DataFrame({
+                'time': outdoor_indoor_measurements['time'].flatten(),
+                'global out': outdoor_indoor_measurements['par_out'].flatten(),
+                'global in': outdoor_indoor_measurements['par_in'].flatten(),
+                'temp out': outdoor_indoor_measurements['temp_out'].flatten(),
+                'temp in': outdoor_indoor_measurements['temp_in'].flatten(),
+                'rh out': outdoor_indoor_measurements['hum_out'].flatten(),
+                'rh in': outdoor_indoor_measurements['hum_in'].flatten(),
+                'co2 out': outdoor_indoor_measurements['co2_out'].flatten(),
+                'co2 in': outdoor_indoor_measurements['co2_in'].flatten()
+            })
 
-        # Extract the required columns and flatten them
-        new_time_excel = self.step_data['time'].values
-        new_global_out_excel = self.step_data['global out'].values
-        new_global_in_excel = self.step_data['global in'].values
-        new_temp_in_excel = self.step_data['temp in'].values
-        new_temp_out_excel = self.step_data['temp out'].values
-        new_rh_in_excel = self.step_data['rh in'].values
-        new_rh_out_excel = self.step_data['rh out'].values
-        new_co2_in_excel = self.step_data['co2 in'].values
-        new_co2_out_excel = self.step_data['co2 out'].values
+            # Optionally: Check or print the step_data structure to ensure it's correct
+            print("Step Data (online):", self.step_data.head())
+            
+            # Map the outdoor measurements to the corresponding variables
+            new_time_excel_mqtt = outdoor_indoor_measurements['time'].flatten()
+            new_global_out_excel_mqtt = outdoor_indoor_measurements['par_out'].flatten()
+            new_global_in_excel_mqtt = outdoor_indoor_measurements['par_in'].flatten()  
+            new_temp_out_excel_mqtt = outdoor_indoor_measurements['temp_out'].flatten()  
+            new_temp_in_excel_mqtt = outdoor_indoor_measurements['temp_in'].flatten()
+            new_rh_out_excel_mqtt = outdoor_indoor_measurements['hum_out'].flatten()  
+            new_rh_in_excel_mqtt = outdoor_indoor_measurements['hum_in'].flatten()
+            new_co2_out_excel_mqtt = outdoor_indoor_measurements['co2_out'].flatten()  
+            new_co2_in_excel_mqtt = outdoor_indoor_measurements['co2_in'].flatten()
+            
+            if self.action_from_drl == True and _action_drl is not None:
+                # Use the actions from the DRL model and convert actions to discrete values
+                ventilation = 1 if _action_drl[0] >= 0.5 else 0
+                toplights = 1 if _action_drl[1] >= 0.5 else 0
+                heater = 1 if _action_drl[2] >= 0.5 else 0
+                
+                ventilation = np.full(4, ventilation)
+                toplights = np.full(4, toplights)
+                heater = np.full(4, heater)
+                
+                # Update the step_data with the DRL model's actions using .loc
+                self.step_data.loc[:, 'toplights'] = toplights
+                self.step_data.loc[:, 'ventilation'] = ventilation
+                self.step_data.loc[:, 'heater'] = heater
+                
+                # Add new data
+                new_toplights = self.step_data['toplights'].values
+                new_ventilation = self.step_data['ventilation'].values
+                new_heater = self.step_data['heater'].values
+
+            else:
+                # Use the actions from the offline dataset and add new data
+                new_toplights = self.step_data['toplights'].values
+                new_ventilation = self.step_data['ventilation'].values
+                new_heater = self.step_data['heater'].values
+
+            # Check if instance variables already exist; if not, initialize them
+            if not hasattr(self, 'time_excel_mqtt'):
+                self.time_excel_mqtt = new_time_excel_mqtt
+                self.global_out_excel_mqtt = new_global_out_excel_mqtt
+                self.global_in_excel_mqtt = new_global_in_excel_mqtt
+                self.temp_in_excel_mqtt = new_temp_in_excel_mqtt
+                self.temp_out_excel_mqtt = new_temp_out_excel_mqtt
+                self.rh_in_excel_mqtt = new_rh_in_excel_mqtt
+                self.rh_out_excel_mqtt = new_rh_out_excel_mqtt
+                self.co2_in_excel_mqtt = new_co2_in_excel_mqtt
+                self.co2_out_excel_mqtt = new_co2_out_excel_mqtt
+                self.toplights = new_toplights
+                self.ventilation = new_ventilation
+                self.heater = new_heater
+            else:
+                # Concatenate new data with existing data
+                self.time_excel_mqtt = np.concatenate((self.time_excel_mqtt, new_time_excel_mqtt))
+                self.global_out_excel_mqtt = np.concatenate((self.global_out_excel_mqtt, new_global_out_excel_mqtt))
+                self.global_in_excel_mqtt = np.concatenate((self.global_in_excel_mqtt, new_global_in_excel_mqtt))
+                self.temp_in_excel_mqtt = np.concatenate((self.temp_in_excel_mqtt, new_temp_in_excel_mqtt))
+                self.temp_out_excel_mqtt = np.concatenate((self.temp_out_excel_mqtt, new_temp_out_excel_mqtt))
+                self.rh_in_excel_mqtt = np.concatenate((self.rh_in_excel_mqtt, new_rh_in_excel_mqtt))
+                self.rh_out_excel_mqtt = np.concatenate((self.rh_out_excel_mqtt, new_rh_out_excel_mqtt))
+                self.co2_in_excel_mqtt = np.concatenate((self.co2_in_excel_mqtt, new_co2_in_excel_mqtt))
+                self.co2_out_excel_mqtt = np.concatenate((self.co2_out_excel_mqtt, new_co2_out_excel_mqtt))
+                self.toplights = np.concatenate((self.toplights, new_toplights))
+                self.ventilation = np.concatenate((self.ventilation, new_ventilation))
+                self.heater = np.concatenate((self.heater, new_heater))
+                
+        elif self.online_measurements == False:
+            # Use offline dataset 
         
-        if self.action_from_drl == True and _action_drl is not None:
-            # Use the actions from the DRL model
-            # Convert actions to discrete values
-            ventilation = 1 if _action_drl[0] >= 0.5 else 0
-            toplights = 1 if _action_drl[1] >= 0.5 else 0
-            heater = 1 if _action_drl[2] >= 0.5 else 0
-            
-            ventilation = np.full(4, ventilation)
-            toplights = np.full(4, toplights)
-            heater = np.full(4, heater)
+            # Slice the dataframe to get the rows for the current step
+            self.step_data = self.mgh_data.iloc[self.season_length_nn:self.season_length_nn + 4]
 
-            # Update the step_data with the DRL model's actions
-            # self.step_data['toplights'] = toplights
-            # self.step_data['ventilation'] = ventilation
-            # self.step_data['heater'] = heater
+            # Extract the required columns and flatten them
+            new_time_excel_mqtt = self.step_data['time'].values
+            new_global_out_excel_mqtt = self.step_data['global out'].values
+            new_global_in_excel_mqtt = self.step_data['global in'].values
+            new_temp_in_excel_mqtt = self.step_data['temp in'].values
+            new_temp_out_excel_mqtt = self.step_data['temp out'].values
+            new_rh_in_excel_mqtt = self.step_data['rh in'].values
+            new_rh_out_excel_mqtt = self.step_data['rh out'].values
+            new_co2_in_excel_mqtt = self.step_data['co2 in'].values
+            new_co2_out_excel_mqtt = self.step_data['co2 out'].values
             
-            # Update the step_data with the DRL model's actions using .loc
-            self.step_data.loc[:, 'toplights'] = toplights
-            self.step_data.loc[:, 'ventilation'] = ventilation
-            self.step_data.loc[:, 'heater'] = heater
-            
-            # Add new data
-            new_toplights = self.step_data['toplights'].values
-            new_ventilation = self.step_data['ventilation'].values
-            new_heater = self.step_data['heater'].values
+            if self.action_from_drl == True and _action_drl is not None:
+                # Use the actions from the DRL model
+                # Convert actions to discrete values
+                ventilation = 1 if _action_drl[0] >= 0.5 else 0
+                toplights = 1 if _action_drl[1] >= 0.5 else 0
+                heater = 1 if _action_drl[2] >= 0.5 else 0
+                
+                ventilation = np.full(4, ventilation)
+                toplights = np.full(4, toplights)
+                heater = np.full(4, heater)
+                
+                # Update the step_data with the DRL model's actions using .loc
+                self.step_data.loc[:, 'toplights'] = toplights
+                self.step_data.loc[:, 'ventilation'] = ventilation
+                self.step_data.loc[:, 'heater'] = heater
+                
+                # Add new data
+                new_toplights = self.step_data['toplights'].values
+                new_ventilation = self.step_data['ventilation'].values
+                new_heater = self.step_data['heater'].values
 
-        else:
-            # Use the actions from the offline dataset and
-            # add new data
-            new_toplights = self.step_data['toplights'].values
-            new_ventilation = self.step_data['ventilation'].values
-            new_heater = self.step_data['heater'].values
+            else:
+                # Use the actions from the offline dataset and add new data
+                new_toplights = self.step_data['toplights'].values
+                new_ventilation = self.step_data['ventilation'].values
+                new_heater = self.step_data['heater'].values
 
-        # Check if instance variables already exist; if not, initialize them
-        if not hasattr(self, 'time_excel'):
-            self.time_excel = new_time_excel
-            self.global_out_excel = new_global_out_excel
-            self.global_in_excel = new_global_in_excel
-            self.temp_in_excel = new_temp_in_excel
-            self.temp_out_excel = new_temp_out_excel
-            self.rh_in_excel = new_rh_in_excel
-            self.rh_out_excel = new_rh_out_excel
-            self.co2_in_excel = new_co2_in_excel
-            self.co2_out_excel = new_co2_out_excel
-            self.toplights = new_toplights
-            self.ventilation = new_ventilation
-            self.heater = new_heater
-        else:
-            # Concatenate new data with existing data
-            self.time_excel = np.concatenate((self.time_excel, new_time_excel))
-            self.global_out_excel = np.concatenate((self.global_out_excel, new_global_out_excel))
-            self.global_in_excel = np.concatenate((self.global_in_excel, new_global_in_excel))
-            self.temp_in_excel = np.concatenate((self.temp_in_excel, new_temp_in_excel))
-            self.temp_out_excel = np.concatenate((self.temp_out_excel, new_temp_out_excel))
-            self.rh_in_excel = np.concatenate((self.rh_in_excel, new_rh_in_excel))
-            self.rh_out_excel = np.concatenate((self.rh_out_excel, new_rh_out_excel))
-            self.co2_in_excel = np.concatenate((self.co2_in_excel, new_co2_in_excel))
-            self.co2_out_excel = np.concatenate((self.co2_out_excel, new_co2_out_excel))
-            self.toplights = np.concatenate((self.toplights, new_toplights))
-            self.ventilation = np.concatenate((self.ventilation, new_ventilation))
-            self.heater = np.concatenate((self.heater, new_heater))
+            # Check if instance variables already exist; if not, initialize them
+            if not hasattr(self, 'time_excel_mqtt'):
+                self.time_excel_mqtt = new_time_excel_mqtt
+                self.global_out_excel_mqtt = new_global_out_excel_mqtt
+                self.global_in_excel_mqtt = new_global_in_excel_mqtt
+                self.temp_in_excel_mqtt = new_temp_in_excel_mqtt
+                self.temp_out_excel_mqtt = new_temp_out_excel_mqtt
+                self.rh_in_excel_mqtt = new_rh_in_excel_mqtt
+                self.rh_out_excel_mqtt = new_rh_out_excel_mqtt
+                self.co2_in_excel_mqtt = new_co2_in_excel_mqtt
+                self.co2_out_excel_mqtt = new_co2_out_excel_mqtt
+                self.toplights = new_toplights
+                self.ventilation = new_ventilation
+                self.heater = new_heater
+            else:
+                # Concatenate new data with existing data
+                self.time_excel_mqtt = np.concatenate((self.time_excel_mqtt, new_time_excel_mqtt))
+                self.global_out_excel_mqtt = np.concatenate((self.global_out_excel_mqtt, new_global_out_excel_mqtt))
+                self.global_in_excel_mqtt = np.concatenate((self.global_in_excel_mqtt, new_global_in_excel_mqtt))
+                self.temp_in_excel_mqtt = np.concatenate((self.temp_in_excel_mqtt, new_temp_in_excel_mqtt))
+                self.temp_out_excel_mqtt = np.concatenate((self.temp_out_excel_mqtt, new_temp_out_excel_mqtt))
+                self.rh_in_excel_mqtt = np.concatenate((self.rh_in_excel_mqtt, new_rh_in_excel_mqtt))
+                self.rh_out_excel_mqtt = np.concatenate((self.rh_out_excel_mqtt, new_rh_out_excel_mqtt))
+                self.co2_in_excel_mqtt = np.concatenate((self.co2_in_excel_mqtt, new_co2_in_excel_mqtt))
+                self.co2_out_excel_mqtt = np.concatenate((self.co2_out_excel_mqtt, new_co2_out_excel_mqtt))
+                self.toplights = np.concatenate((self.toplights, new_toplights))
+                self.ventilation = np.concatenate((self.ventilation, new_ventilation))
+                self.heater = np.concatenate((self.heater, new_heater))
     
     def predicted_inside_measurements_nn(self, _action_drl):
         '''
@@ -405,7 +483,7 @@ class CalibratorModel(gym.Env):
         
         '''
         # Load the updated data from the excel file
-        self.load_excel_data(_action_drl)
+        self.load_excel_or_mqtt_data(_action_drl)
         
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
         new_par_in_predicted_nn = self.predict_inside_measurements('global in', self.step_data)
@@ -420,6 +498,7 @@ class CalibratorModel(gym.Env):
             self.rh_in_predicted_nn = new_rh_in_predicted_nn
             self.co2_in_predicted_nn = new_co2_in_predicted_nn
             
+            # For debugging
             # print("LENGTH self.par_in_predicted", len(self.par_in_predicted_nn))
             # print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted_nn))
             # print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted_nn))
@@ -431,6 +510,7 @@ class CalibratorModel(gym.Env):
             self.rh_in_predicted_nn = np.concatenate((self.rh_in_predicted_nn, new_rh_in_predicted_nn))
             self.co2_in_predicted_nn = np.concatenate((self.co2_in_predicted_nn, new_co2_in_predicted_nn))
             
+            # For debugging
             # print("self.par_in_predicted", self.par_in_predicted)
             # print("self.temp_in_predicted", self.temp_in_predicted)
             # print("self.rh_in_predicted", self.rh_in_predicted)
@@ -496,7 +576,7 @@ class CalibratorModel(gym.Env):
         int: The initial observation of the environment.
         '''
         self.current_step = 0
-        # self.season_length_nn += 4
+        # self.season_length_nn += 4 # moved it to the intialized class 
         
         return self.observation(), {}
 
@@ -524,6 +604,8 @@ class CalibratorModel(gym.Env):
         #     self.rh_in_predicted[-1][0],   # Ensure this is a scalar value
         #     self.co2_in_predicted[-1][0]   # Ensure this is a scalar value
         # ], np.float32)
+        
+        # TO-DO: Make the observation from the combined model
         
         return np.array([
             self.co2_in_predicted_gl[-1],
@@ -758,7 +840,7 @@ class CalibratorModel(gym.Env):
         
         if self.online_measurements == True:
             # Get the outdoor measurements
-            self.service_functions.get_outdoor_measurements()
+            self.service_functions.get_outdoor_indoor_measurements()
 
         # Run the script with the updated state variables
         if self.online_measurements == True:
@@ -794,10 +876,10 @@ class CalibratorModel(gym.Env):
         - heater_list: List of action for heater from DRL model or offline datasets
         - reward_list: List of reward for iterated step
         
-        - co2_in_excel: List of actual CO2 values
-        - temp_in_excel: List of actual temperature values
-        - rh_in_excel: List of actual relative humidity values
-        - par_in_excel: List of actual PAR values
+        - co2_in_excel_mqtt: List of actual CO2 values
+        - temp_in_excel_mqtt: List of actual temperature values
+        - rh_in_excel_mqtt: List of actual relative humidity values
+        - par_in_excel_mqtt: List of actual PAR values
         
         - co2_in_predicted_nn: List of predicted CO2 values from Neural Network
         - temp_in_predicted_nn: List of predicted temperature values from Neural Network
@@ -810,37 +892,17 @@ class CalibratorModel(gym.Env):
         - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
         '''
         
-        # Ensure all lists and arrays are 1D
-        # def ensure_1d(arr):
-        #     return arr.reshape(-1) if arr.ndim > 1 else arr
-
-        # # Flatten the arrays with shape (16, 1) to (16,)
-        # self.co2_in_combined_models = ensure_1d(self.co2_in_combined_models)
-        # self.temp_in_combined_models = ensure_1d(self.temp_in_combined_models)
-        # self.rh_in_combined_models = ensure_1d(self.rh_in_combined_models)
-        # self.par_in_combined_models = ensure_1d(self.par_in_combined_models)
-        
-        # self.co2_in_combined_models = self.co2_in_combined_models[:, 0]
-        # self.temp_in_combined_models = self.temp_in_combined_models[:, 0]
-        # self.rh_in_combined_models = self.rh_in_combined_models[:, 0]
-        # self.par_in_combined_models = self.par_in_combined_models[:, 0]
-        
-        # self.co2_in_combined_models = self.co2_in_combined_models.flatten()
-        # self.temp_in_combined_models = self.temp_in_combined_models.flatten()
-        # self.rh_in_combined_models = self.rh_in_combined_models.flatten()
-        # self.par_in_combined_models = self.par_in_combined_models.flatten()
-        
         print("\n\n-------------------------------------------------------------------------------------")
         print("Print all the appended data.")
-        print(f"Length of Time: {len(self.time_excel)}")
+        print(f"Length of Time: {len(self.time_excel_mqtt)}")
         print(f"Length of Action Ventilation: {len(self.ventilation_list)}")
         print(f"Length of Action Toplights: {len(self.toplights_list)}")
         print(f"Length of Action Heater: {len(self.heater_list)}")
         print(f"Length of reward: {len(self.rewards_list)}")
-        print(f"Length of CO2 In (Actual): {len(self.co2_in_excel)}")
-        print(f"Length of Temperature In (Actual): {len(self.temp_in_excel)}")
-        print(f"Length of RH In (Actual): {len(self.rh_in_excel)}")
-        print(f"Length of PAR In (Actual): {len(self.global_in_excel)}")
+        print(f"Length of CO2 In (Actual): {len(self.co2_in_excel_mqtt)}")
+        print(f"Length of Temperature In (Actual): {len(self.temp_in_excel_mqtt)}")
+        print(f"Length of RH In (Actual): {len(self.rh_in_excel_mqtt)}")
+        print(f"Length of PAR In (Actual): {len(self.global_in_excel_mqtt)}")
         print(f"Length of Predicted CO2 In (NN): {len(self.co2_in_predicted_nn)}")
         print(f"Length of Predicted Temperature In (NN): {len(self.temp_in_predicted_nn)}")
         print(f"Length of Predicted RH In (NN): {len(self.rh_in_predicted_nn)}")
@@ -865,7 +927,7 @@ class CalibratorModel(gym.Env):
         # Save all the data in an Excel file
         self.service_functions.export_to_excel(
             file_name, time_steps_formatted, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
-            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+            self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
             self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models
@@ -874,7 +936,7 @@ class CalibratorModel(gym.Env):
         # Plot the data
         self.service_functions.plot_all_data(
             'output/output_all_data.png', time_steps_formatted, 
-            self.co2_in_excel, self.temp_in_excel, self.rh_in_excel, self.global_in_excel,
+            self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
             self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models,
@@ -891,10 +953,10 @@ class CalibratorModel(gym.Env):
         '''
         
         # Extract actual values
-        y_true_par_in = self.global_in_excel
-        y_true_temp_in = self.temp_in_excel
-        y_true_rh_in = self.rh_in_excel
-        y_true_co2_in = self.co2_in_excel
+        y_true_par_in = self.global_in_excel_mqtt
+        y_true_temp_in = self.temp_in_excel_mqtt
+        y_true_rh_in = self.rh_in_excel_mqtt
+        y_true_co2_in = self.co2_in_excel_mqtt
 
         # Extract predicted values
         y_pred_par_in_nn = self.par_in_predicted_nn[:, 0]
@@ -1079,5 +1141,3 @@ class CalibratorModel(gym.Env):
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):
         self.eng.quit()
-        
-

@@ -52,7 +52,7 @@ for episode in tqdm(range(50)):  # Train for 250 episodes
     #     print(f"Checkpoint saved in directory {checkpoint_dir}")
         
 # Save the model checkpoint
-save_result = algo.save('gl-model/model-calibrator-config-0')
+save_result = algo.save('trained-drl-models/model-calibrator-config-0')
 
 path_to_checkpoint = save_result
 print(

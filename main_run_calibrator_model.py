@@ -30,7 +30,7 @@ from CalibratorModel import CalibratorModel
 # created in the first place:
 
 # my_new_ppo = Algorithm.from_checkpoint('physics-model/model-minigreenhouse-config-3')
-my_new_ppo = Algorithm.from_checkpoint('gl-model/model-calibrator-config-0')
+my_new_ppo = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
 
 # Make the calibratorModel instance
 env = CalibratorModel({"flag_run": True,

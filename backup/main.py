@@ -1,6 +1,6 @@
 # Import CalibratorModel
 
-from NeuralNetworksModel import NeuralNetworksModel
+from backup.NeuralNetworksModel import NeuralNetworksModel
 from utils.LoadMiniGreenhouseData import LoadMiniGreenhouseData
 
 nn_model = NeuralNetworksModel()

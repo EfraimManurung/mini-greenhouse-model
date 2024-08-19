@@ -1,5 +1,5 @@
 # Assuming the NeuralNetworksModel class is defined as provided
-from NeuralNetworksModel import NeuralNetworksModel
+from backup.NeuralNetworksModel import NeuralNetworksModel
 
 nn_model = NeuralNetworksModel({"flag_run": True,
                                 "first_day": 0,

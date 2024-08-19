@@ -110,7 +110,8 @@ class CalibratorModel(gym.Env):
         # Path to MATLAB script
         # Change path based on your directory!
         if self.flag_run_gl == True:
-            self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
+            #self.matlab_script_path = r'C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\matlab\DrlGlEnvironment.m'
+            self.matlab_script_path = r'matlab\DrlGlEnvironment.m'
         
         if self.flag_run_nn == True:
             # Load the datasets from separate files for the NN model
@@ -221,7 +222,7 @@ class CalibratorModel(gym.Env):
             data_input = pd.DataFrame(data_input)
         
         # Need to be fixed
-        features = ['time', 'global out', 'temp out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
+        features = ['time', 'global out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
 
         # Ensure the data_input has the required features
         for feature in features:
@@ -231,10 +232,10 @@ class CalibratorModel(gym.Env):
         X_features = data_input[features]
         
         # Load the model using the native Keras format
-        loaded_model = load_model(f'nn-model/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
         
         # Load the scalerc:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-drl-model\main_run.py
-        scaler = joblib.load(f'nn-model/{target_variable}_scaler.pkl')
+        scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
             
         # Scale the input features
         X_features_scaled = scaler.transform(X_features)
@@ -1000,7 +1001,7 @@ class CalibratorModel(gym.Env):
         X_features_reshaped = X_features_values.reshape((X_features_values.shape[0], -1, X_features_values.shape[1]))
         
         # Load the GRU model
-        with open(f"gru-models/{target_variable.replace(' ', '_')}_gru_model.json", "r") as json_file:
+        with open(f"trained-gru-models/{target_variable.replace(' ', '_')}_gru_model.json", "r") as json_file:
             loaded_model_json = json_file.read()
             loaded_model = tf.keras.models.model_from_json(
                 loaded_model_json,
@@ -1012,7 +1013,7 @@ class CalibratorModel(gym.Env):
             )
         
         # Load the model weights
-        loaded_model.load_weights(f"gru-models/{target_variable.replace(' ', '_')}_gru_model.weights.h5")
+        loaded_model.load_weights(f"trained-gru-models/{target_variable.replace(' ', '_')}_gru_model.weights.h5")
         
         # Compile the loaded model
         loaded_model.compile(optimizer='adam', loss='mse', metrics=['mae', self.r2_score_metric])

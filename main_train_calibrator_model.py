@@ -17,15 +17,15 @@ config.resources(num_cpus_per_worker=1)
 config.environment(
     env=CalibratorModel,
         env_config={"flag_run": False,
-                        "first_day": 1,
-                        "season_length_gl": 1/72,
-                        "season_length_nn": 0, 
-                        "online_measurements": False,
-                        "action_from_drl": True,
-                        "flag_run_nn": False,
-                        "flag_run_gl": True,
-                        "max_steps": 3
-                        })
+                    "first_day_gl": 1,
+                    "first_day_nn": 0,
+                    "season_length_gl": 1/72,
+                    "online_measurements": False,
+                    "action_from_drl": True,
+                    "flag_run_nn": False,
+                    "flag_run_gl": True,
+                    "max_steps": 3
+                    })
 
 config.training(
     gamma=0.9,  # Discount factor
@@ -45,14 +45,14 @@ config.training(
 algo = config.build()
 
 # Train the algorithm
-for episode in tqdm(range(50)):  # Train for 250 episodes
+for episode in tqdm(range(10)):  # Train for 250 episodes
     result = algo.train()  # Perform training
     # if episode % 5 == 0:  # Save a checkpoint every 5 episodes
     #     checkpoint_dir = algo.save().checkpoint.path
     #     print(f"Checkpoint saved in directory {checkpoint_dir}")
         
 # Save the model checkpoint
-save_result = algo.save('trained-drl-models/model-calibrator-config-0')
+save_result = algo.save('trained-drl-models/model-calibrator-config-test')
 
 path_to_checkpoint = save_result
 print(

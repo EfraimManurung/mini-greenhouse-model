@@ -29,19 +29,20 @@ from CalibratorModel import CalibratorModel
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-# my_new_ppo = Algorithm.from_checkpoint('physics-model/model-minigreenhouse-config-3')
-my_new_ppo = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
+# ppo_model_from_checkpoint = Algorithm.from_checkpoint('physics-model/model-minigreenhouse-config-3')
+# ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-test')
 
 # Make the calibratorModel instance
 env = CalibratorModel({"flag_run": True,
-                        "first_day": 1,
+                        "first_day_gl": 1,
+                        "first_day_nn": 0,
                         "season_length_gl": 1/72,
-                        "season_length_nn": 0, 
-                        "online_measurements": False,
-                        "action_from_drl": False,
+                        "online_measurements": True,
+                        "action_from_drl": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
-                        "max_steps": 6
+                        "max_steps": 3
                         })
 
 # Get the initial observation (should be: [0.0] for the starting position).
@@ -57,7 +58,7 @@ while not terminated and not truncated:
     
     # Compute a single action, given the current observation
     # from the environment.
-    action = my_new_ppo.compute_single_action(obs)
+    action = ppo_model_from_checkpoint.compute_single_action(obs)
     
     # Apply the computed action in the environment.
     obs, reward, terminated, _, info = env.step(action)

@@ -108,16 +108,18 @@ class CalibratorModel(gym.Env):
         if self.flag_run_gl == True:
             self.matlab_script_path = r'matlab\DrlGlEnvironment.m'
         
-        if self.flag_run_nn == True:
-            # Load the datasets from separate files for the NN model
-            file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
-            
-            # Load the dataset
-            self.mgh_data = pd.read_excel(file_path)
+        # if self.flag_run_nn == True:
         
-            # Display the first few rows of the dataframe
-            print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
-            print(self.mgh_data.head())
+        # No matter if the flag_run_nn True or not we still need to load the files for the offline training
+        # Load the datasets from separate files for the NN model
+        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
+        
+        # Load the dataset
+        self.mgh_data = pd.read_excel(file_path)
+    
+        # Display the first few rows of the dataframe
+        print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
+        print(self.mgh_data.head())
         
         # Initialize lists to store control values
         self.ventilation_list = []
@@ -135,7 +137,10 @@ class CalibratorModel(gym.Env):
 
         # Initialize ServiceFunctions
         self.service_functions = ServiceFunctions()
-
+        
+        # Load the updated data from the excel or from mqtt 
+        self.load_excel_or_mqtt_data(None)
+        
         # Check if MATLAB script exists
         if os.path.isfile(self.matlab_script_path):
             
@@ -145,7 +150,8 @@ class CalibratorModel(gym.Env):
             # Call the MATLAB function 
             if self.online_measurements == True:
                 # Initialize outdoor measurements, to get the outdoor measurements
-                self.service_functions.get_outdoor_indoor_measurements()
+                # self.service_functions.get_outdoor_indoor_measurements()
+                # self.load_excel_or_mqtt_data(None)
                 
                 # Run the script with the updated outdoor measurements for the first time
                 self.run_matlab_script('outdoor.mat', None, None)
@@ -163,7 +169,7 @@ class CalibratorModel(gym.Env):
         if self.flag_run_nn == True:
             
             # Predict from the NN model
-            self.predicted_inside_measurements_nn(None)
+            self.predicted_inside_measurements_nn()
             self.season_length_nn += 4
         
         # Define the observation and action space
@@ -317,7 +323,7 @@ class CalibratorModel(gym.Env):
         '''
 
         if self.online_measurements == True:
-            print("Self online measurements True load excel or mqtt data")
+            print("load_excel_or_mqtt_data from ONLINE MEASUREMENTS")
             
             # Initialize outdoor measurements, to get the outdoor measurements
             outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements()
@@ -334,9 +340,11 @@ class CalibratorModel(gym.Env):
                 'co2 out': outdoor_indoor_measurements['co2_out'].flatten(),
                 'co2 in': outdoor_indoor_measurements['co2_in'].flatten()
             })
-
-            # Optionally: Check or print the step_data structure to ensure it's correct
-            print("Step Data (online):", self.step_data.head())
+            
+            # Add empty columns for toplights, ventilation, and heater
+            self.step_data['toplights'] = np.nan       # or None
+            self.step_data['ventilation'] = np.nan     # or None
+            self.step_data['heater'] = np.nan          # or None
             
             # Map the outdoor measurements to the corresponding variables
             new_time_excel_mqtt = outdoor_indoor_measurements['time'].flatten()
@@ -370,6 +378,16 @@ class CalibratorModel(gym.Env):
                 new_heater = self.step_data['heater'].values
 
             else:
+                # Handle if the _action_drl is None for the first time 
+                ventilation = np.full(4, 0)
+                toplights = np.full(4, 0)
+                heater = np.full(4, 0)
+                
+                # Update the step_data with the DRL model's actions using .loc
+                self.step_data.loc[:, 'toplights'] = toplights
+                self.step_data.loc[:, 'ventilation'] = ventilation
+                self.step_data.loc[:, 'heater'] = heater
+                
                 # Use the actions from the offline dataset and add new data
                 new_toplights = self.step_data['toplights'].values
                 new_ventilation = self.step_data['ventilation'].values
@@ -403,9 +421,13 @@ class CalibratorModel(gym.Env):
                 self.toplights = np.concatenate((self.toplights, new_toplights))
                 self.ventilation = np.concatenate((self.ventilation, new_ventilation))
                 self.heater = np.concatenate((self.heater, new_heater))
-                
+        
+            # Optionally: Check or print the step_data structure to ensure it's correct
+            print("Step Data (online):", self.step_data.head())
+        
         elif self.online_measurements == False:
             # Use offline dataset 
+            print("load_excel_or_mqtt_data from OFFLINE MEASUREMENTS")
         
             # Slice the dataframe to get the rows for the current step
             self.step_data = self.mgh_data.iloc[self.season_length_nn:self.season_length_nn + 4]
@@ -476,15 +498,18 @@ class CalibratorModel(gym.Env):
                 self.toplights = np.concatenate((self.toplights, new_toplights))
                 self.ventilation = np.concatenate((self.ventilation, new_ventilation))
                 self.heater = np.concatenate((self.heater, new_heater))
-    
-    def predicted_inside_measurements_nn(self, _action_drl):
+
+            # Optionally: Check or print the step_data structure to ensure it's correct
+            print("Step Data (offline):", self.step_data.head())
+            
+    def predicted_inside_measurements_nn(self):
         '''
         Predicted inside measurements
         
         '''
         # Load the updated data from the excel file
-        self.load_excel_or_mqtt_data(_action_drl)
-        
+        # self.load_excel_or_mqtt_data(_action_drl)
+    
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
         new_par_in_predicted_nn = self.predict_inside_measurements('global in', self.step_data)
         new_temp_in_predicted_nn = self.predict_inside_measurements('temp in', self.step_data)
@@ -740,10 +765,6 @@ class CalibratorModel(gym.Env):
         print("----------------------------------")
         print("CURRENT STEPS: ", self.current_step)
         
-        if self.flag_run_nn == True:
-            # Call the predicted inside measurements with the NN model
-            self.predicted_inside_measurements_nn(_action_drl)
-        
         if self.action_from_drl == True and _action_drl is not None:
             # Get the action from the DRL model 
             print("ACTION: ", _action_drl)
@@ -766,9 +787,9 @@ class CalibratorModel(gym.Env):
             heater = self.heater[-4:]
                                  
         print("CONVERTED ACTION")
-        print("ventilation: ", ventilation)
         print("toplights: ", toplights)
-        print("heating: ", heater)
+        print("ventilation: ", ventilation)
+        print("heater: ", heater)
 
         # Keep only the latest 3 data points before appending
         # Append controls to the lists
@@ -838,9 +859,14 @@ class CalibratorModel(gym.Env):
         # Save the fruit growth to .mat file
         sio.savemat('fruit.mat', fruit_growth)
         
-        if self.online_measurements == True:
-            # Get the outdoor measurements
-            self.service_functions.get_outdoor_indoor_measurements()
+        # if self.online_measurements == True:
+        #     # Get the outdoor measurements
+        #     self.service_functions.get_outdoor_indoor_measurements()
+        
+        # Load the updated data from the excel or from mqtt, depends on the online or offline measurements
+        # With online or offline measurements, we need to call the data
+        # Get the oudoor measurements
+        self.load_excel_or_mqtt_data(_action_drl)
 
         # Run the script with the updated state variables
         if self.online_measurements == True:
@@ -851,6 +877,10 @@ class CalibratorModel(gym.Env):
         if self.flag_run_gl == True:
             # Load the updated data from predcited from the greenlight model
             self.predicted_inside_measurements_gl()
+        
+        if self.flag_run_nn == True:
+            # Call the predicted inside measurements with the NN model
+            self.predicted_inside_measurements_nn()
             
         # Calculate reward
         # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the is the same)

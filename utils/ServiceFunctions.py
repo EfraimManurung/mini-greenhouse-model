@@ -404,7 +404,7 @@ class ServiceFunctions:
             # self.process_received_data(data) 
             
             # Process the received data and return it
-            self.outdoor_measurements_1 = self.process_received_data(data)
+            self.return_outdoor_measurements = self.process_received_data(data)
         
             # Set the flag to indicate a message was received
             self.message_received = True
@@ -424,7 +424,7 @@ class ServiceFunctions:
         self.client_sub.loop_stop()  # Ensure the loop is stopped
         self.client_sub.disconnect()  # Disconnect the client
         
-        return self.outdoor_measurements_1 # Return the processed
+        return self.return_outdoor_measurements # Return the processed
 
     def process_received_data(self, data):
         '''
@@ -450,6 +450,7 @@ class ServiceFunctions:
         co2_in= data.get("co2_in", [])
         
         # Print the extracted variables
+        print("Received from ONLINE MEASUREMENTS")
         print("Time:", time)
         print("PAR Out:", par_out)
         print("Temperature Out:", temp_out)

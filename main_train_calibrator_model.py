@@ -20,10 +20,12 @@ config.environment(
                     "first_day_gl": 1,
                     "first_day_nn": 0,
                     "season_length_gl": 1/72,
+                    "season_length_nn": 0,
                     "online_measurements": False,
                     "action_from_drl": True,
                     "flag_run_nn": False,
                     "flag_run_gl": True,
+                    "flag_run_combined": False,
                     "max_steps": 3
                     })
 

@@ -80,12 +80,9 @@ class CalibratorModel(gym.Env):
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
         self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
-        
         self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
-        
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
-        
-        # or just only using offline datasets
+        self.flag_run_combined = env_config.get("flag_run_combined", True) # Default is true, flag to run the GRU model
         self.first_day_gl = env_config.get("first_day_gl", 1) # The first day of the simulation
         
         # Define the season length parameter
@@ -96,10 +93,10 @@ class CalibratorModel(gym.Env):
         # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
         self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
         self.first_day_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
-        self.season_length_nn = self.first_day_nn 
+        self.season_length_nn = self.first_day_nn #env_config.get("season_length_nn", 0) # so we can substract the timesteps, that is why we used the season_length_nn from the first_day
         
         # Initiate and max steps
-        self.max_steps = env_config.get("max_steps", 4) # How many iteration the program run
+        self.max_steps = env_config.get("max_steps", 3) # How many iteration the program run
     
         # Start MATLAB engine
         self.eng = matlab.engine.start_matlab()
@@ -107,8 +104,6 @@ class CalibratorModel(gym.Env):
         # Path to MATLAB script
         if self.flag_run_gl == True:
             self.matlab_script_path = r'matlab\DrlGlEnvironment.m'
-        
-        # if self.flag_run_nn == True:
         
         # No matter if the flag_run_nn True or not we still need to load the files for the offline training
         # Load the datasets from separate files for the NN model
@@ -149,10 +144,7 @@ class CalibratorModel(gym.Env):
             
             # Call the MATLAB function 
             if self.online_measurements == True:
-                # Initialize outdoor measurements, to get the outdoor measurements
-                # self.service_functions.get_outdoor_indoor_measurements()
-                # self.load_excel_or_mqtt_data(None)
-                
+
                 # Run the script with the updated outdoor measurements for the first time
                 self.run_matlab_script('outdoor.mat', None, None)
             else:
@@ -163,7 +155,7 @@ class CalibratorModel(gym.Env):
             print(f"MATLAB script not found: {self.matlab_script_path}")
 
         if self.flag_run_gl == True:
-            # Predict from the gl model
+            #Predict from the GL model
             self.predicted_inside_measurements_gl()
             
         if self.flag_run_nn == True:
@@ -171,6 +163,12 @@ class CalibratorModel(gym.Env):
             # Predict from the NN model
             self.predicted_inside_measurements_nn()
             self.season_length_nn += 4
+            
+        if self.flag_run_combined == True:
+            # Combine the predicted results from the GL and NN models
+            time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
+            print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
+            self.predicted_combined_models(time_steps_formatted_for_combined_models)
         
         # Define the observation and action space
         self.define_spaces()
@@ -193,57 +191,6 @@ class CalibratorModel(gym.Env):
         SS_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true))) 
         return (1 - SS_res/(SS_tot + tf.keras.backend.epsilon()))
     
-    def predict_inside_measurements(self, target_variable, data_input):
-        '''
-        Predict the measurements or state variables inside mini-greenhouse 
-        
-        Parameters:
-        target_variable: str - The target variable to predict.
-        data_input: dict or pd.DataFrame - The input features for the prediction.
-
-        Features (inputs):
-            Outside measurements information
-                - time
-                - global out
-                - temp out
-                - rh out
-                - co2 out
-            Control(s) input
-                - ventilation
-                - toplights
-                - heater
-        
-        Return: 
-        np.array: predicted measurements inside mini-greenhouse
-        '''
-        if isinstance(data_input, dict):
-            data_input = pd.DataFrame(data_input)
-        
-        # Need to be fixed
-        features = ['time', 'global out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
-
-        # Ensure the data_input has the required features
-        for feature in features:
-            if feature not in data_input.columns:
-                raise ValueError(f"Missing feature '{feature}' in the input data.")
-        
-        X_features = data_input[features]
-        
-        # Load the model using the native Keras format
-        loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
-        
-        # Load the scaler
-        scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
-            
-        # Scale the input features
-        X_features_scaled = scaler.transform(X_features)
-        
-        # Predict the measurements
-        y_hat_measurements = loaded_model.predict(X_features_scaled)
-        
-        # Return the predicted measurements inside the mini-greenhouse
-        return y_hat_measurements
-
     def define_spaces(self):
         '''
         Define the observation and action spaces.
@@ -499,9 +446,60 @@ class CalibratorModel(gym.Env):
                 self.ventilation = np.concatenate((self.ventilation, new_ventilation))
                 self.heater = np.concatenate((self.heater, new_heater))
 
-            # Optionally: Check or print the step_data structure to ensure it's correct
+            # Debugging
             print("Step Data (offline):", self.step_data.head())
             
+    def predict_inside_measurements_nn(self, target_variable, data_input):
+        '''
+        Predict the measurements or state variables inside mini-greenhouse 
+        
+        Parameters:
+        target_variable: str - The target variable to predict.
+        data_input: dict or pd.DataFrame - The input features for the prediction.
+
+        Features (inputs):
+            Outside measurements information
+                - time
+                - global out
+                - temp out
+                - rh out
+                - co2 out
+            Control(s) input
+                - ventilation
+                - toplights
+                - heater
+        
+        Return: 
+        np.array: predicted measurements inside mini-greenhouse
+        '''
+        if isinstance(data_input, dict):
+            data_input = pd.DataFrame(data_input)
+        
+        # Need to be fixed
+        features = ['time', 'global out', 'temp out', 'rh out', 'co2 out', 'ventilation', 'toplights', 'heater']
+
+        # Ensure the data_input has the required features
+        for feature in features:
+            if feature not in data_input.columns:
+                raise ValueError(f"Missing feature '{feature}' in the input data.")
+        
+        X_features = data_input[features]
+        
+        # Load the model using the native Keras format
+        loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        
+        # Load the scaler
+        scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
+            
+        # Scale the input features
+        X_features_scaled = scaler.transform(X_features)
+        
+        # Predict the measurements
+        y_hat_measurements = loaded_model.predict(X_features_scaled)
+        
+        # Return the predicted measurements inside the mini-greenhouse
+        return y_hat_measurements
+    
     def predicted_inside_measurements_nn(self):
         '''
         Predicted inside measurements
@@ -511,10 +509,10 @@ class CalibratorModel(gym.Env):
         # self.load_excel_or_mqtt_data(_action_drl)
     
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
-        new_par_in_predicted_nn = self.predict_inside_measurements('global in', self.step_data)
-        new_temp_in_predicted_nn = self.predict_inside_measurements('temp in', self.step_data)
-        new_rh_in_predicted_nn = self.predict_inside_measurements('rh in', self.step_data)
-        new_co2_in_predicted_nn = self.predict_inside_measurements('co2 in', self.step_data)
+        new_par_in_predicted_nn = self.predict_inside_measurements_nn('global in', self.step_data)
+        new_temp_in_predicted_nn = self.predict_inside_measurements_nn('temp in', self.step_data)
+        new_rh_in_predicted_nn = self.predict_inside_measurements_nn('rh in', self.step_data)
+        new_co2_in_predicted_nn = self.predict_inside_measurements_nn('co2 in', self.step_data)
     
         # Check if instance variables already exist; if not, initialize them
         if not hasattr(self, 'temp_in_predicted_nn'):
@@ -541,10 +539,10 @@ class CalibratorModel(gym.Env):
             # print("self.rh_in_predicted", self.rh_in_predicted)
             # print("self.co2_in_predicted", self.co2_in_predicted)
             
-            print("LENGTH self.par_in_predicted", len(self.par_in_predicted_nn))
-            print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted_nn))
-            print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted_nn))
-            print("LENGTH self.co2_in_predicted", len(self.co2_in_predicted_nn))
+            print("LENGTH self.par_in_predicted_nn", len(self.par_in_predicted_nn))
+            print("LENGTH self.temp_in_predicted_nn", len(self.temp_in_predicted_nn))
+            print("LENGTH self.rh_in_predicted_nn", len(self.rh_in_predicted_nn))
+            print("LENGTH self.co2_in_predicted_nn", len(self.co2_in_predicted_nn))
     
     def predicted_inside_measurements_gl(self):
         '''
@@ -557,6 +555,7 @@ class CalibratorModel(gym.Env):
         
         # Read the drl-env mat from the initialization 
         # Read the 3 values and append it
+        # get the prediction from the matlab results
         data = sio.loadmat("drl-env.mat")
         
         new_time_gl = data['time'].flatten()[-4:]
@@ -631,6 +630,15 @@ class CalibratorModel(gym.Env):
         # ], np.float32)
         
         # TO-DO: Make the observation from the combined model
+        if self.flag_run_combined == True:
+            if self.current_step > 0:
+                
+                # print the predict measurements using the GRU model
+                print("PRINT THE OBSERVATION BASED ON THE COMBINED MODELS")
+                print("self.co2_in_predicted_combined_models :", self.co2_in_predicted_combined_models[-1])
+                print("self.temp_in_predicted_combined_models : ", self.temp_in_predicted_combined_models[-1])
+                print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
+                print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
         
         return np.array([
             self.co2_in_predicted_gl[-1],
@@ -859,12 +867,8 @@ class CalibratorModel(gym.Env):
         # Save the fruit growth to .mat file
         sio.savemat('fruit.mat', fruit_growth)
         
-        # if self.online_measurements == True:
-        #     # Get the outdoor measurements
-        #     self.service_functions.get_outdoor_indoor_measurements()
-        
-        # Load the updated data from the excel or from mqtt, depends on the online or offline measurements
-        # With online or offline measurements, we need to call the data
+        # Load the updated data from the excel or from mqtt, for online or offline measurements, 
+        # we still need to call the data
         # Get the oudoor measurements
         self.load_excel_or_mqtt_data(_action_drl)
 
@@ -881,6 +885,12 @@ class CalibratorModel(gym.Env):
         if self.flag_run_nn == True:
             # Call the predicted inside measurements with the NN model
             self.predicted_inside_measurements_nn()
+        
+        if self.flag_run_combined == True:
+            # Combine the predicted results from the GL and NN models
+            time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
+            print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
+            self.predicted_combined_models(time_steps_formatted_for_combined_models)
             
         # Calculate reward
         # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the is the same)
@@ -941,40 +951,35 @@ class CalibratorModel(gym.Env):
         print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
         print(f"Length of Predicted PAR In (GL): {len(self.par_in_predicted_gl)}")
-        
-        # time_steps_formatted = range(0, self.season_length_nn)
-        time_steps_formatted = range(0, int(self.season_length_nn - self.first_day_nn))
-        print("Time Steps Formatted: ", time_steps_formatted)
-
-        time_steps_formatted_2 = list(range(0, int(self.season_length_nn - self.first_day_nn)))
-
-        # Combine predictions
-        self.predicted_combined_model(time_steps_formatted_2)
-        
+        print(f"Length of Predicted CO2 In (GRU-Combined-models): {len(self.co2_in_predicted_combined_models)}")
+        print(f"Length of Predicted Temperature In (GRU-Combined-models): {len(self.temp_in_predicted_combined_models)}")
+        print(f"Length of Predicted RH In (GRU-Combined-models): {len(self.rh_in_predicted_combined_models)}")
+        print(f"Length of Predicted PAR In (GRU-Combined-models): {len(self.par_in_predicted_combined_models)}")
+                
         # Evaluate predictions to get R² and MAE metrics
         metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
         
         # Save all the data in an Excel file
         self.service_functions.export_to_excel(
-            file_name, time_steps_formatted, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+            file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
             self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
-            self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models
+            self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
         )
 
         # Plot the data
         self.service_functions.plot_all_data(
-            'output/output_all_data.png', time_steps_formatted, 
+            'output/output_all_data.png', self.time_combined_models, 
             self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
             self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
-            self.co2_in_combined_models, self.temp_in_combined_models, self.rh_in_combined_models, self.par_in_combined_models,
+            self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
             metrics_nn, metrics_gl, metrics_combined
         )
         
         # Plot the rewards and actions
-        self.service_functions.plot_rewards_actions('output/output_rewards_action.png', time_steps_formatted, self.ventilation_list, self.toplights_list, 
+        self.service_functions.plot_rewards_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
                                                     self.heater_list, self.rewards_list)
 
     def evaluate_predictions(self):
@@ -1000,10 +1005,10 @@ class CalibratorModel(gym.Env):
         y_pred_co2_in_gl = self.co2_in_predicted_gl
 
         # Extract combined model predictions
-        y_pred_par_in_combined = self.par_in_combined_models
-        y_pred_temp_in_combined = self.temp_in_combined_models
-        y_pred_rh_in_combined = self.rh_in_combined_models
-        y_pred_co2_in_combined = self.co2_in_combined_models
+        y_pred_par_in_combined = self.par_in_predicted_combined_models
+        y_pred_temp_in_combined = self.temp_in_predicted_combined_models
+        y_pred_rh_in_combined = self.rh_in_predicted_combined_models
+        y_pred_co2_in_combined = self.co2_in_predicted_combined_models
 
         # Calculate R² and MAE for each variable
         def calculate_metrics(y_true, y_pred):
@@ -1118,7 +1123,7 @@ class CalibratorModel(gym.Env):
         
         return y_hat_measurements_1d
     
-    def predicted_combined_model(self, _timesteps):
+    def predicted_combined_models(self, _timesteps):
         """
         Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL), 
         and include predictions from the GRU model for all variables.
@@ -1129,18 +1134,6 @@ class CalibratorModel(gym.Env):
         - self.rh_in_combined_models
         - self.par_in_combined_models
         """
-
-        # Print shapes of the arrays to debug
-        print("Shapes of input arrays:")
-        print(f"timesteps: {len(_timesteps)}")
-        print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
-        print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
-        print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
-        print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
-        print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
-        print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
-        print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
-        print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
 
         # Create data_input for GRU prediction
         data_input = pd.DataFrame({
@@ -1155,19 +1148,51 @@ class CalibratorModel(gym.Env):
             'PAR In (Predicted NN)': self.par_in_predicted_nn[:, 0]
         })
         
-        print("DATA INPUT!!! : \n", data_input)
+        # print("DATA INPUT!!! : \n", data_input)
 
-        # Predict measurements using GRU model
-        self.co2_in_combined_models = self.predict_inside_measurements_gru("CO2 In", data_input)
-        self.temp_in_combined_models = self.predict_inside_measurements_gru("Temperature In", data_input)
-        self.rh_in_combined_models = self.predict_inside_measurements_gru("RH In", data_input)
-        self.par_in_combined_models = self.predict_inside_measurements_gru("PAR In", data_input)
+        # Predict inside measurements using the GRU model
+        new_time_combined = data_input['timesteps'][-4:]
+        new_par_in_predicted_combined = self.predict_inside_measurements_gru("PAR In", data_input)[-4:]
+        new_temp_in_predicted_combined = self.predict_inside_measurements_gru("Temperature In", data_input)[-4:]
+        new_rh_in_predicted_combined = self.predict_inside_measurements_gru("RH In", data_input)[-4:]
+        new_co2_in_predicted_combined = self.predict_inside_measurements_gru("CO2 In", data_input)[-4:]
         
-        print(f"Shape of co2_in_predicted_nn: {self.co2_in_predicted_nn.shape}")
-        print(f"Shape of temp_in_predicted_nn: {self.temp_in_predicted_nn.shape}")
-        print(f"Shape of rh_in_predicted_nn: {self.rh_in_predicted_nn.shape}")
-        print(f"Shape of par_in_predicted_nn: {self.par_in_predicted_nn.shape}")
+        # Predict measurements using GRU model
+        # self.co2_in_combined_models = self.predict_inside_measurements_gru("CO2 In", data_input)
+        # self.temp_in_combined_models = self.predict_inside_measurements_gru("Temperature In", data_input)
+        # self.rh_in_combined_models = self.predict_inside_measurements_gru("RH In", data_input)
+        # self.par_in_combined_models = self.predict_inside_measurements_gru("PAR In", data_input)
+        
+        # Check if instance variables already exist; if not, initialize them
+        if not hasattr(self, 'time_combined_models'):
+            self.time_combined_models = new_time_combined
+            self.co2_in_predicted_combined_models = new_co2_in_predicted_combined
+            self.temp_in_predicted_combined_models = new_temp_in_predicted_combined
+            self.rh_in_predicted_combined_models = new_rh_in_predicted_combined
+            self.par_in_predicted_combined_models = new_par_in_predicted_combined
+        else:
+            self.time_combined_models = np.concatenate((self.time_combined_models, new_time_combined))
+            self.co2_in_predicted_combined_models = np.concatenate((self.co2_in_predicted_combined_models, new_co2_in_predicted_combined))
+            self.temp_in_predicted_combined_models = np.concatenate((self.temp_in_predicted_combined_models, new_temp_in_predicted_combined))
+            self.rh_in_predicted_combined_models = np.concatenate((self.rh_in_predicted_combined_models, new_rh_in_predicted_combined))
+            self.par_in_predicted_combined_models = np.concatenate((self.par_in_predicted_combined_models, new_par_in_predicted_combined))
 
+        # Print shapes of the arrays to debug
+        print("Shapes of input arrays:")
+        print(f"timesteps: {_timesteps}")
+        print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
+        print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
+        print(f"CO2 In (Predicted GRU - combined models): {self.co2_in_predicted_combined_models.shape}")
+        print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
+        print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
+        print(f"Temperature In (Predicted GRU - combined models): {self.temp_in_predicted_combined_models.shape}")
+        print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
+        print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
+        print(f"RH In (Predicted GRU - combined models): {self.rh_in_predicted_combined_models.shape}")
+        print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
+        print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
+        print(f"PAR In (Predicted GRU - combined models): {self.par_in_predicted_combined_models.shape}")
+        
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):
         self.eng.quit()

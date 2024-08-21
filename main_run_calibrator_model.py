@@ -38,11 +38,13 @@ env = CalibratorModel({"flag_run": True,
                         "first_day_gl": 1,
                         "first_day_nn": 0,
                         "season_length_gl": 1/72,
-                        "online_measurements": True,
+                        "season_length_nn": 0,
+                        "online_measurements": False,
                         "action_from_drl": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
-                        "max_steps": 3
+                        "flag_run_combined": True,
+                        "max_steps": 72
                         })
 
 # Get the initial observation (should be: [0.0] for the starting position).

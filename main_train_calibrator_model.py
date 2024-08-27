@@ -43,18 +43,24 @@ config.training(
         sgd_minibatch_size=1
 )
 
+# # Build the algorithm object
+# algo = config.build()
+
 # Build the algorithm object
-algo = config.build()
+try:
+    algo = config.build()
+except Exception as e:
+    raise RuntimeError(f"Failed to build the PPO algorithm: {e}")
 
 # Train the algorithm
-for episode in tqdm(range(10)):  # Train for 250 episodes
+for episode in tqdm(range(250)):  # Train for 250 episodes
     result = algo.train()  # Perform training
     # if episode % 5 == 0:  # Save a checkpoint every 5 episodes
     #     checkpoint_dir = algo.save().checkpoint.path
     #     print(f"Checkpoint saved in directory {checkpoint_dir}")
         
 # Save the model checkpoint
-save_result = algo.save('trained-drl-models/model-calibrator-config-test')
+save_result = algo.save('trained-drl-models/model-calibrator-config-0')
 
 path_to_checkpoint = save_result
 print(

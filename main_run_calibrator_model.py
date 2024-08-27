@@ -29,9 +29,7 @@ from CalibratorModel import CalibratorModel
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-# ppo_model_from_checkpoint = Algorithm.from_checkpoint('physics-model/model-minigreenhouse-config-3')
-# ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-test')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
 
 # Make the calibratorModel instance
 env = CalibratorModel({"flag_run": True,
@@ -39,12 +37,13 @@ env = CalibratorModel({"flag_run": True,
                         "first_day_nn": 0,
                         "season_length_gl": 1/72,
                         "season_length_nn": 0,
-                        "online_measurements": False,
+                        "online_measurements": True,
                         "action_from_drl": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
                         "flag_run_combined": True,
-                        "max_steps": 72
+                        "indoor_combined": False,
+                        "max_steps": 12
                         })
 
 # Get the initial observation (should be: [0.0] for the starting position).

@@ -78,25 +78,23 @@ class CalibratorModel(gym.Env):
         
         # Initialize if the main program for training or running
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
+        self.first_day_gl = env_config.get("first_day_gl", 1) # The first day of the simulation
+        self.first_day_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
+        
+        # Define the season length parameter
+        # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
+        self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
+        self.season_length_nn = self.first_day_nn #env_config.get("season_length_nn", 0) # so we can substract the timesteps, that is why we used the season_length_nn from the first_day
+        
         self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
         self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         self.flag_run_combined = env_config.get("flag_run_combined", True) # Default is true, flag to run the GRU model
-        self.first_day_gl = env_config.get("first_day_gl", 1) # The first day of the simulation
-        
-        # Define the season length parameter
-        # 20 minutes
-        # But remember, the first 5 minutes is the initial values so
-        # only count for the 15 minutes
-        # The calculation look like this:
-        # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
-        self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
-        self.first_day_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
-        self.season_length_nn = self.first_day_nn #env_config.get("season_length_nn", 0) # so we can substract the timesteps, that is why we used the season_length_nn from the first_day
+        self.indoor_combined = env_config.get("indoor_combined", False)
         
         # Initiate and max steps
-        self.max_steps = env_config.get("max_steps", 3) # How many iteration the program run
+        self.max_steps = env_config.get("max_steps", 3) # One episode = 3 steps = 1 hour, because 1 step = 20 minutes
     
         # Start MATLAB engine
         self.eng = matlab.engine.start_matlab()
@@ -485,11 +483,22 @@ class CalibratorModel(gym.Env):
         
         X_features = data_input[features]
         
-        # Load the model using the native Keras format
-        loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        # Load the model and scaler with error handling
+        try:
+            loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        except Exception as e:
+            raise ValueError(f"Failed to load the model: {e}")
         
-        # Load the scaler
-        scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
+        try:
+            scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
+        except Exception as e:
+            raise ValueError(f"Failed to load the scaler: {e}")
+        
+        # # Load the model using the native Keras format
+        # loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+        
+        # # Load the scaler
+        # scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
             
         # Scale the input features
         X_features_scaled = scaler.transform(X_features)
@@ -631,26 +640,39 @@ class CalibratorModel(gym.Env):
         
         # TO-DO: Make the observation from the combined model
         if self.flag_run_combined == True:
-            if self.current_step > 0:
+            # if self.current_step > 0:
                 
-                # print the predict measurements using the GRU model
-                print("PRINT THE OBSERVATION BASED ON THE COMBINED MODELS")
-                print("self.co2_in_predicted_combined_models :", self.co2_in_predicted_combined_models[-1])
-                print("self.temp_in_predicted_combined_models : ", self.temp_in_predicted_combined_models[-1])
-                print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
-                print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
-        
-        return np.array([
-            self.co2_in_predicted_gl[-1],
-            self.temp_in_predicted_gl[-1],
-            self.rh_in_predicted_gl[-1],
-            self.par_in_predicted_gl[-1],
-            self.fruit_leaf_predicted_gl[-1],
-            self.fruit_stem_predicted_gl[-1],
-            self.fruit_dw_predicted_gl[-1],
-            self.fruit_cbuf_predicted_gl[-1],
-            self.fruit_tcansum_predicted_gl[-1]
-        ], np.float32) 
+            # print the predict measurements using the GRU model
+            print("PRINT THE OBSERVATION BASED ON THE COMBINED MODELS")
+            print("self.co2_in_predicted_combined_models :", self.co2_in_predicted_combined_models[-1])
+            print("self.temp_in_predicted_combined_models : ", self.temp_in_predicted_combined_models[-1])
+            print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
+            print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
+            
+            return np.array([
+                self.co2_in_predicted_combined_models[-1],      # use combined models for the observation
+                self.temp_in_predicted_combined_models[-1],     # use combined models for the observation
+                self.rh_in_predicted_combined_models[-1],       # use combined models for the observation
+                self.par_in_predicted_combined_models[-1],      # use combined models for the observation
+                self.fruit_leaf_predicted_gl[-1],
+                self.fruit_stem_predicted_gl[-1],
+                self.fruit_dw_predicted_gl[-1],
+                self.fruit_cbuf_predicted_gl[-1],
+                self.fruit_tcansum_predicted_gl[-1]
+            ], np.float32) 
+                
+        else:
+            return np.array([
+                self.co2_in_predicted_gl[-1],
+                self.temp_in_predicted_gl[-1],
+                self.rh_in_predicted_gl[-1],
+                self.par_in_predicted_gl[-1],
+                self.fruit_leaf_predicted_gl[-1],
+                self.fruit_stem_predicted_gl[-1],
+                self.fruit_dw_predicted_gl[-1],
+                self.fruit_cbuf_predicted_gl[-1],
+                self.fruit_tcansum_predicted_gl[-1]
+            ], np.float32) 
 
     def get_reward(self, _ventilation, _toplights, _heater):
         '''
@@ -835,24 +857,51 @@ class CalibratorModel(gym.Env):
         # Update the season_length for the NN model
         self.season_length_nn += 4
 
-        # Convert co2_in ppm
-        co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_gl[-4:], self.co2_in_predicted_gl[-4:])
-        
-        # Convert Relative Humidity (RH) to Pressure in Pa
-        vapor_density_gl = self.service_functions.rh_to_vapor_density(self.temp_in_predicted_gl[-4:], self.rh_in_predicted_gl[-4:])
-        vapor_pressure_gl = self.service_functions.vapor_density_to_pressure(self.temp_in_predicted_gl[-4:], vapor_density_gl)
+        if self.flag_run_gl == True and self.indoor_combined == False:
+            
+            print("USE INDOOR GREENLIGHT")
+            # Use the data from the GreenLight model
+            # Convert co2_in ppm
+            co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_gl[-4:], self.co2_in_predicted_gl[-4:])
+            
+            # Convert Relative Humidity (RH) to Pressure in Pa
+            vapor_density_gl = self.service_functions.rh_to_vapor_density(self.temp_in_predicted_gl[-4:], self.rh_in_predicted_gl[-4:])
+            vapor_pressure_gl = self.service_functions.vapor_density_to_pressure(self.temp_in_predicted_gl[-4:], vapor_density_gl)
 
-        # Update the MATLAB environment with the 3 latest current state
-        # It will be used to be simulated in the GreenLight model with mini-greenhouse parameters
-        drl_indoor = {
-            'time': self.time_gl[-3:].astype(float).reshape(-1, 1),
-            'temp_in': self.temp_in_predicted_gl[-3:].astype(float).reshape(-1, 1),
-            'rh_in': vapor_pressure_gl[-3:].astype(float).reshape(-1, 1),
-            'co2_in': co2_density_gl[-3:].astype(float).reshape(-1, 1)
-        }
+            # Update the MATLAB environment with the 3 latest current state
+            # It will be used to be simulated in the GreenLight model with mini-greenhouse parameters
+            drl_indoor = {
+                'time': self.time_gl[-3:].astype(float).reshape(-1, 1),
+                'temp_in': self.temp_in_predicted_gl[-3:].astype(float).reshape(-1, 1),
+                'rh_in': vapor_pressure_gl[-3:].astype(float).reshape(-1, 1),
+                'co2_in': co2_density_gl[-3:].astype(float).reshape(-1, 1)
+            }
         
-        # Save control variables to .mat file
-        sio.savemat('indoor.mat', drl_indoor)
+            # Save control variables to .mat file
+            sio.savemat('indoor.mat', drl_indoor)
+            
+        elif self.flag_run_gl == True and self.indoor_combined == True:
+            
+            print("USE INDOOR COMBINED MODELS")
+            # Use the data from the combined model
+            # Convert co2_in ppm
+            co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_combined_models[-4:], self.co2_in_predicted_combined_models[-4:])
+            
+            # Convert Relative Humidity (RH) to Pressure in Pa
+            vapor_density_gl = self.service_functions.rh_to_vapor_density(self.temp_in_predicted_combined_models[-4:], self.rh_in_predicted_combined_models[-4:])
+            vapor_pressure_gl = self.service_functions.vapor_density_to_pressure(self.temp_in_predicted_combined_models[-4:], vapor_density_gl)
+
+            # Update the MATLAB environment with the 3 latest current state
+            # It will be used to be simulated in the GreenLight model with mini-greenhouse parameters
+            drl_indoor = {
+                'time': self.time_gl[-3:].astype(float).reshape(-1, 1),
+                'temp_in': self.temp_in_predicted_combined_models[-3:].astype(float).reshape(-1, 1),
+                'rh_in': vapor_pressure_gl[-3:].astype(float).reshape(-1, 1),
+                'co2_in': co2_density_gl[-3:].astype(float).reshape(-1, 1)
+            }
+        
+            # Save control variables to .mat file
+            sio.savemat('indoor.mat', drl_indoor)
 
         # Update the fruit growth with the 1 latest current state from the GreenLight model - mini-greenhouse parameters
         fruit_growth = {

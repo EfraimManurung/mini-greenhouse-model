@@ -52,16 +52,15 @@ from utils.ServiceFunctions import ServiceFunctions
 import tensorflow as tf
 tf.config.run_functions_eagerly(True)
 from tensorflow.keras.models import load_model
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, GRU, Dense, Multiply, Add, Layer
+from tensorflow.keras.layers import Layer
 import joblib
 import pandas as pd
 import numpy as np
-import sklearn.metrics as metrics
+from sklearn.metrics import mean_squared_error
 
 class CalibratorModel(gym.Env):
     '''
-    Calibrator model that combine a NN model and glysics based model.
+    Calibrator model that combine a NN model and physics based model.
     
     Link the Python code to matlab program with related methods. We can link it with the .mat file.
     '''
@@ -165,7 +164,7 @@ class CalibratorModel(gym.Env):
         if self.flag_run_combined == True:
             # Combine the predicted results from the GL and NN models
             time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
-            print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
+            # print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
             self.predicted_combined_models(time_steps_formatted_for_combined_models)
         
         # Define the observation and action space
@@ -548,10 +547,10 @@ class CalibratorModel(gym.Env):
             # print("self.rh_in_predicted", self.rh_in_predicted)
             # print("self.co2_in_predicted", self.co2_in_predicted)
             
-            print("LENGTH self.par_in_predicted_nn", len(self.par_in_predicted_nn))
-            print("LENGTH self.temp_in_predicted_nn", len(self.temp_in_predicted_nn))
-            print("LENGTH self.rh_in_predicted_nn", len(self.rh_in_predicted_nn))
-            print("LENGTH self.co2_in_predicted_nn", len(self.co2_in_predicted_nn))
+            # print("LENGTH self.par_in_predicted_nn", len(self.par_in_predicted_nn))
+            # print("LENGTH self.temp_in_predicted_nn", len(self.temp_in_predicted_nn))
+            # print("LENGTH self.rh_in_predicted_nn", len(self.rh_in_predicted_nn))
+            # print("LENGTH self.co2_in_predicted_nn", len(self.co2_in_predicted_nn))
     
     def predicted_inside_measurements_gl(self):
         '''
@@ -1033,7 +1032,7 @@ class CalibratorModel(gym.Env):
 
     def evaluate_predictions(self):
         '''
-        Evaluate the R² and MAE of the predicted vs actual values for `par_in`, `temp_in`, `rh_in`, and `co2_in`.
+        Evaluate the RMSE, RRMSE, and ME of the predicted vs actual values for `par_in`, `temp_in`, `rh_in`, and `co2_in`.
         '''
         
         # Extract actual values
@@ -1059,11 +1058,12 @@ class CalibratorModel(gym.Env):
         y_pred_rh_in_combined = self.rh_in_predicted_combined_models
         y_pred_co2_in_combined = self.co2_in_predicted_combined_models
 
-        # Calculate R² and MAE for each variable
+        # Calculate RMSE, RRMSE, and ME for each variable
         def calculate_metrics(y_true, y_pred):
-            r2 = metrics.r2_score(y_true, y_pred)
-            mae = metrics.mean_absolute_error(y_true, y_pred)
-            return r2, mae
+            rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+            rrmse = rmse / np.mean(y_true)
+            me = np.mean(y_pred - y_true)
+            return rmse, rrmse, me
 
         metrics_nn = {
             'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_nn),
@@ -1087,14 +1087,31 @@ class CalibratorModel(gym.Env):
         }
 
         # Print the results
-        print("Evaluation Results:")
+        print("------------------------------------------------------------------------------------")
+        print("EVALUATION RESULTS :")
         for variable in ['PAR', 'Temperature', 'Humidity', 'CO2']:
-            r2_nn, mae_nn = metrics_nn[variable]
-            r2_gl, mae_gl = metrics_gl[variable]
-            r2_combined, mae_combined = metrics_combined[variable]
-            print(f"{variable} (NN): R² = {r2_nn:.4f}, MAE = {mae_nn:.4f}")
-            print(f"{variable} (GL): R² = {r2_gl:.4f}, MAE = {mae_gl:.4f}")
-            print(f"{variable} (Combined): R² = {r2_combined:.4f}, MAE = {mae_combined:.4f}")
+            rmse_nn, rrmse_nn, me_nn = metrics_nn[variable]
+            rmse_gl, rrmse_gl, me_gl = metrics_gl[variable]
+            rmse_combined, rrmse_combined, me_combined = metrics_combined[variable]
+            
+            if variable == 'Temperature':
+                unit_rmse = "°C"
+                unit_me = "°C"
+            elif variable == 'Humidity':
+                unit_rmse = "%"
+                unit_me = "%"
+            elif variable == 'CO2':
+                unit_rmse = "ppm"
+                unit_me = "ppm"
+            else:
+                unit_rmse = "W/m²"  # Assuming PAR is in W/m² (common unit)
+                unit_me = "W/m²"
+
+            unit_rrmse = "%"  # RRMSE is always in percentage for all variables
+            
+            print(f"{variable} (NN): RMSE = {rmse_nn:.4f} {unit_rmse}, RRMSE = {rrmse_nn:.4f} {unit_rrmse}, ME = {me_nn:.4f} {unit_me}")
+            print(f"{variable} (GL): RMSE = {rmse_gl:.4f} {unit_rmse}, RRMSE = {rrmse_gl:.4f} {unit_rrmse}, ME = {me_gl:.4f} {unit_me}")
+            print(f"{variable} (Combined): RMSE = {rmse_combined:.4f} {unit_rmse}, RRMSE = {rrmse_combined:.4f} {unit_rrmse}, ME = {me_combined:.4f} {unit_me}")
 
         return metrics_nn, metrics_gl, metrics_combined
     
@@ -1227,20 +1244,20 @@ class CalibratorModel(gym.Env):
             self.par_in_predicted_combined_models = np.concatenate((self.par_in_predicted_combined_models, new_par_in_predicted_combined))
 
         # Print shapes of the arrays to debug
-        print("Shapes of input arrays:")
-        print(f"timesteps: {_timesteps}")
-        print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
-        print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
-        print(f"CO2 In (Predicted GRU - combined models): {self.co2_in_predicted_combined_models.shape}")
-        print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
-        print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
-        print(f"Temperature In (Predicted GRU - combined models): {self.temp_in_predicted_combined_models.shape}")
-        print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
-        print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
-        print(f"RH In (Predicted GRU - combined models): {self.rh_in_predicted_combined_models.shape}")
-        print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
-        print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
-        print(f"PAR In (Predicted GRU - combined models): {self.par_in_predicted_combined_models.shape}")
+        # print("Shapes of input arrays:")
+        # print(f"timesteps: {_timesteps}")
+        # print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
+        # print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
+        # print(f"CO2 In (Predicted GRU - combined models): {self.co2_in_predicted_combined_models.shape}")
+        # print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
+        # print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
+        # print(f"Temperature In (Predicted GRU - combined models): {self.temp_in_predicted_combined_models.shape}")
+        # print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
+        # print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
+        # print(f"RH In (Predicted GRU - combined models): {self.rh_in_predicted_combined_models.shape}")
+        # print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
+        # print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
+        # print(f"PAR In (Predicted GRU - combined models): {self.par_in_predicted_combined_models.shape}")
         
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

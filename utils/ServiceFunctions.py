@@ -171,7 +171,7 @@ class ServiceFunctions:
             ax.plot(time, y_data, label=title, color='blue')  # Plot the data
             
             ax.set_title(title)  # Set the title for each subplot
-            ax.set_xlabel('Timesteps [- / 5 minutes]')  # Set the x-axis label
+            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
             ax.set_ylabel(title)  # Set the y-axis label
             ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
             ax.legend()  # Add legend to each subplot
@@ -214,9 +214,9 @@ class ServiceFunctions:
         - rh_combined: List of combined relative humidity predictions
         - par_combined: List of combined PAR predictions
         
-        - metrics_nn: Dictionary with R² and MAE for NN predictions
-        - metrics_gl: Dictionary with R² and MAE for GL predictions
-        - metrics_combined: Dictionary with R² and MAE for Combined predictions
+        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions
+        - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions
+        - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions
         '''
 
         # Create subplots with 2 rows and 2 columns
@@ -237,12 +237,12 @@ class ServiceFunctions:
             ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')  # Plot GL predicted data
             ax.plot(time, y_combined, label='Predicted Combined', color='red', linestyle='-.')  # Plot combined predicted data
             
-            # Add R² and MAE to the title
-            ax.set_title(f"{title}\nNN R²: {metrics_nn[0]:.4f}, MAE: {metrics_nn[1]:.4f}\n"
-                        f"GL R²: {metrics_gl[0]:.4f}, MAE: {metrics_gl[1]:.4f}\n"
-                        f"Combined R²: {metrics_combined[0]:.4f}, MAE: {metrics_combined[1]:.4f}")
+            # Add RMSE, RRMSE, and ME to the title
+            ax.set_title(f"{title}\nNN RMSE: {metrics_nn[0]:.4f}, RRMSE: {metrics_nn[1]:.4f}, ME: {metrics_nn[2]:.4f}\n"
+                        f"GL RMSE: {metrics_gl[0]:.4f}, RRMSE: {metrics_gl[1]:.4f}, ME: {metrics_gl[2]:.4f}\n"
+                        f"Combined RMSE: {metrics_combined[0]:.4f}, RRMSE: {metrics_combined[1]:.4f}, ME: {metrics_combined[2]:.4f}")
             
-            ax.set_xlabel('Timesteps [- / 5 minutes]')  # Set the x-axis label
+            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
             ax.set_ylabel(title)  # Set the y-axis label
             ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
             ax.legend()  # Add legend to distinguish between actual and predicted data
@@ -292,7 +292,7 @@ class ServiceFunctions:
         '''
 
         data = {
-            'Timesteps [- / 5 minutes]': time,
+            'Timesteps [5 minutes / -]':time,
             'Action Ventilation': ventilation_list,
             'Action Toplights': toplights_list,
             'Action Heater': heater_list,

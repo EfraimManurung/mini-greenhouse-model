@@ -937,7 +937,7 @@ class CalibratorModel(gym.Env):
         if self.flag_run_combined == True:
             # Combine the predicted results from the GL and NN models
             time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
-            print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
+            # print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
             self.predicted_combined_models(time_steps_formatted_for_combined_models)
             
         # Calculate reward
@@ -1015,6 +1015,9 @@ class CalibratorModel(gym.Env):
             self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
             self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
         )
+        
+        # Save the metrics data in an Excel file as table format
+        self.service_functions.export_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
 
         # Plot the data
         self.service_functions.plot_all_data(

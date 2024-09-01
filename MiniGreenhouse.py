@@ -58,7 +58,7 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error
 
-class CalibratorModel(gym.Env):
+class MiniGreenhouse(gym.Env):
     '''
     Calibrator model that combine a NN model and physics based model.
     
@@ -90,7 +90,6 @@ class CalibratorModel(gym.Env):
         self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         self.flag_run_combined = env_config.get("flag_run_combined", True) # Default is true, flag to run the GRU model
-        self.indoor_combined = env_config.get("indoor_combined", False)
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 3) # One episode = 3 steps = 1 hour, because 1 step = 20 minutes
@@ -856,7 +855,7 @@ class CalibratorModel(gym.Env):
         # Update the season_length for the NN model
         self.season_length_nn += 4
 
-        if self.flag_run_gl == True and self.indoor_combined == False:
+        if self.flag_run_gl == True:
             
             print("USE INDOOR GREENLIGHT")
             # Use the data from the GreenLight model
@@ -879,29 +878,6 @@ class CalibratorModel(gym.Env):
             # Save control variables to .mat file
             sio.savemat('indoor.mat', drl_indoor)
             
-        elif self.flag_run_gl == True and self.indoor_combined == True:
-            
-            print("USE INDOOR COMBINED MODELS")
-            # Use the data from the combined model
-            # Convert co2_in ppm
-            co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_combined_models[-4:], self.co2_in_predicted_combined_models[-4:])
-            
-            # Convert Relative Humidity (RH) to Pressure in Pa
-            vapor_density_gl = self.service_functions.rh_to_vapor_density(self.temp_in_predicted_combined_models[-4:], self.rh_in_predicted_combined_models[-4:])
-            vapor_pressure_gl = self.service_functions.vapor_density_to_pressure(self.temp_in_predicted_combined_models[-4:], vapor_density_gl)
-
-            # Update the MATLAB environment with the 3 latest current state
-            # It will be used to be simulated in the GreenLight model with mini-greenhouse parameters
-            drl_indoor = {
-                'time': self.time_gl[-3:].astype(float).reshape(-1, 1),
-                'temp_in': self.temp_in_predicted_combined_models[-3:].astype(float).reshape(-1, 1),
-                'rh_in': vapor_pressure_gl[-3:].astype(float).reshape(-1, 1),
-                'co2_in': co2_density_gl[-3:].astype(float).reshape(-1, 1)
-            }
-        
-            # Save control variables to .mat file
-            sio.savemat('indoor.mat', drl_indoor)
-
         # Update the fruit growth with the 1 latest current state from the GreenLight model - mini-greenhouse parameters
         fruit_growth = {
             'time': self.time_gl[-1:].astype(float).reshape(-1, 1),
@@ -1017,7 +993,7 @@ class CalibratorModel(gym.Env):
         )
         
         # Save the metrics data in an Excel file as table format
-        self.service_functions.export_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
+        self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
 
         # Plot the data
         self.service_functions.plot_all_data(

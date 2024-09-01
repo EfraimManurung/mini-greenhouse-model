@@ -3,7 +3,7 @@
 from ray.rllib.algorithms.ppo import PPOConfig
 
 # Import the custom environment
-from CalibratorModel import CalibratorModel
+from MiniGreenhouse import MiniGreenhouse
 
 # Import support libraries
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ config = PPOConfig()
 config.rollouts(num_rollout_workers=1)
 config.resources(num_cpus_per_worker=1)
 config.environment(
-    env=CalibratorModel,
+    env=MiniGreenhouse,
         env_config={"flag_run": False,
                     "first_day_gl": 1,
                     "first_day_nn": 0,

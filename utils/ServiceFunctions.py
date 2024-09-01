@@ -357,7 +357,7 @@ class ServiceFunctions:
         # print("JSON DATA: ", json_data)
         return json_data
     
-    def export_to_excel_table(self, filename, metrics_nn, metrics_gl, metrics_combined):
+    def export_evaluated_data_to_excel_table(self, filename, metrics_nn, metrics_gl, metrics_combined):
         '''
         Export the evaluation metrics (RMSE, RRMSE, and ME) for NN, GL, and Combined models to an Excel file.
 
@@ -396,18 +396,18 @@ class ServiceFunctions:
             
             unit_rrmse = "%"  # RRMSE is always in percentage
 
-            # Append rows for each variable and model type
-            rows.append([f"{variable} (NN)", f"{rmse_nn:.4f} {unit_rmse}", f"{rrmse_nn:.4f} {unit_rrmse}", f"{me_nn:.4f} {unit_me}"])
-            rows.append([f"{variable} (GL)", f"{rmse_gl:.4f} {unit_rmse}", f"{rrmse_gl:.4f} {unit_rrmse}", f"{me_gl:.4f} {unit_me}"])
-            rows.append([f"{variable} (Combined)", f"{rmse_combined:.4f} {unit_rmse}", f"{rrmse_combined:.4f} {unit_rrmse}", f"{me_combined:.4f} {unit_me}"])
+            # Append rows for each variable and model type with values and units in separate columns
+            rows.append([f"{variable} (NN)", rmse_nn, unit_rmse, rrmse_nn, unit_rrmse, me_nn, unit_me])
+            rows.append([f"{variable} (GL)", rmse_gl, unit_rmse, rrmse_gl, unit_rrmse, me_gl, unit_me])
+            rows.append([f"{variable} (Combined)", rmse_combined, unit_rmse, rrmse_combined, unit_rrmse, me_combined, unit_me])
 
         # Create a DataFrame
-        df_metrics = pd.DataFrame(rows, columns=["Model", "RMSE", "RRMSE", "ME"])
+        df_metrics = pd.DataFrame(rows, columns=["Model", "RMSE", "RMSE Unit", "RRMSE", "RRMSE Unit", "ME", "ME Unit"])
 
         # Export the DataFrame to an Excel file
         df_metrics.to_excel(filename, index=False)
         print(f"Metrics successfully exported to {filename}")
-
+    
     def publish_mqtt_data(self, json_data, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/drl-controls"):
         '''
         Publish JSON data to an MQTT broker.

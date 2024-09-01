@@ -357,6 +357,57 @@ class ServiceFunctions:
         # print("JSON DATA: ", json_data)
         return json_data
     
+    def export_to_excel_table(self, filename, metrics_nn, metrics_gl, metrics_combined):
+        '''
+        Export the evaluation metrics (RMSE, RRMSE, and ME) for NN, GL, and Combined models to an Excel file.
+
+        Parameters:
+        - filename: Name of the output Excel file
+        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions
+        - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions
+        - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions
+        '''
+
+        # Prepare data for the table
+        rows = []
+        variables = ['PAR', 'Temperature', 'Humidity', 'CO2']
+
+        for variable in variables:
+            # NN metrics
+            rmse_nn, rrmse_nn, me_nn = metrics_nn[variable]
+            # GL metrics
+            rmse_gl, rrmse_gl, me_gl = metrics_gl[variable]
+            # Combined metrics
+            rmse_combined, rrmse_combined, me_combined = metrics_combined[variable]
+            
+            # Set the appropriate units
+            if variable == 'Temperature':
+                unit_rmse = "°C"
+                unit_me = "°C"
+            elif variable == 'Humidity':
+                unit_rmse = "%"
+                unit_me = "%"
+            elif variable == 'CO2':
+                unit_rmse = "ppm"
+                unit_me = "ppm"
+            else:
+                unit_rmse = "W/m²"  # Assuming PAR is in W/m²
+                unit_me = "W/m²"
+            
+            unit_rrmse = "%"  # RRMSE is always in percentage
+
+            # Append rows for each variable and model type
+            rows.append([f"{variable} (NN)", f"{rmse_nn:.4f} {unit_rmse}", f"{rrmse_nn:.4f} {unit_rrmse}", f"{me_nn:.4f} {unit_me}"])
+            rows.append([f"{variable} (GL)", f"{rmse_gl:.4f} {unit_rmse}", f"{rrmse_gl:.4f} {unit_rrmse}", f"{me_gl:.4f} {unit_me}"])
+            rows.append([f"{variable} (Combined)", f"{rmse_combined:.4f} {unit_rmse}", f"{rrmse_combined:.4f} {unit_rrmse}", f"{me_combined:.4f} {unit_me}"])
+
+        # Create a DataFrame
+        df_metrics = pd.DataFrame(rows, columns=["Model", "RMSE", "RRMSE", "ME"])
+
+        # Export the DataFrame to an Excel file
+        df_metrics.to_excel(filename, index=False)
+        print(f"Metrics successfully exported to {filename}")
+
     def publish_mqtt_data(self, json_data, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/drl-controls"):
         '''
         Publish JSON data to an MQTT broker.

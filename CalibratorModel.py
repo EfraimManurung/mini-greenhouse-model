@@ -1064,7 +1064,7 @@ class CalibratorModel(gym.Env):
         # Calculate RMSE, RRMSE, and ME for each variable
         def calculate_metrics(y_true, y_pred):
             rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-            rrmse = rmse / np.mean(y_true)
+            rrmse = rmse / np.mean(y_true) * 100 # Remember that it is in percentage
             me = np.mean(y_pred - y_true)
             return rmse, rrmse, me
 

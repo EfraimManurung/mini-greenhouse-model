@@ -23,27 +23,26 @@ import matplotlib.pyplot as plt  # Import matplotlib for plotting
 from ray.rllib.algorithms.ppo import PPOConfig
 
 # Assuming the NeuralNetworksModel class is defined as provided
-from CalibratorModel import CalibratorModel
+from MiniGreenhouse import MiniGreenhouse
 
 # Use the Algorithm's `from_checkpoint` utility to get a new algo instance
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-1')
 
 # Make the calibratorModel instance
-env = CalibratorModel({"flag_run": True,
+env = MiniGreenhouse({"flag_run": True,
                         "first_day_gl": 1,
                         "first_day_nn": 0,
                         "season_length_gl": 1/72,
                         "season_length_nn": 0,
-                        "online_measurements": True,
+                        "online_measurements": False,
                         "action_from_drl": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
-                        "flag_run_combined": True,
-                        "indoor_combined": False,
-                        "max_steps": 12
+                        "flag_run_combined_models": True,
+                        "max_steps": 3
                         })
 
 # Get the initial observation (should be: [0.0] for the starting position).

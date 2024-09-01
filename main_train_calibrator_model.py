@@ -25,7 +25,7 @@ config.environment(
                     "action_from_drl": True,
                     "flag_run_nn": False,
                     "flag_run_gl": True,
-                    "flag_run_combined": False,
+                    "flag_run_combined_models": False,
                     "max_steps": 3
                     })
 
@@ -53,14 +53,14 @@ except Exception as e:
     raise RuntimeError(f"Failed to build the PPO algorithm: {e}")
 
 # Train the algorithm
-for episode in tqdm(range(250)):  # Train for 250 episodes
+for episode in tqdm(range(10)):  # Train for 250 episodes
     result = algo.train()  # Perform training
     # if episode % 5 == 0:  # Save a checkpoint every 5 episodes
     #     checkpoint_dir = algo.save().checkpoint.path
     #     print(f"Checkpoint saved in directory {checkpoint_dir}")
         
 # Save the model checkpoint
-save_result = algo.save('trained-drl-models/model-calibrator-config-0')
+save_result = algo.save('trained-drl-models/model-calibrator-config-1')
 
 path_to_checkpoint = save_result
 print(

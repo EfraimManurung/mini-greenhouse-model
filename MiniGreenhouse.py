@@ -73,7 +73,7 @@ class MiniGreenhouse(gym.Env):
         env_config(dict): Configuration dictionary for the environment.
         '''  
         
-        print("Initialized CalibratorModel!")
+        print("Initialized MiniGreenhouse Environment!")
         
         # Initialize if the main program for training or running
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
@@ -89,7 +89,7 @@ class MiniGreenhouse(gym.Env):
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
         self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
-        self.flag_run_combined = env_config.get("flag_run_combined", True) # Default is true, flag to run the GRU model
+        self.flag_run_combined_models = env_config.get("flag_run_combined_models", True) # Default is true, flag to run the GRU model
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 3) # One episode = 3 steps = 1 hour, because 1 step = 20 minutes
@@ -160,7 +160,7 @@ class MiniGreenhouse(gym.Env):
             self.predicted_inside_measurements_nn()
             self.season_length_nn += 4
             
-        if self.flag_run_combined == True:
+        if self.flag_run_combined_models == True:
             # Combine the predicted results from the GL and NN models
             time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
             # print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
@@ -637,7 +637,7 @@ class MiniGreenhouse(gym.Env):
         # ], np.float32)
         
         # TO-DO: Make the observation from the combined model
-        if self.flag_run_combined == True:
+        if self.flag_run_combined_models == True:
             # if self.current_step > 0:
                 
             # print the predict measurements using the GRU model
@@ -815,8 +815,8 @@ class MiniGreenhouse(gym.Env):
             heater = self.heater[-4:]
                                  
         print("CONVERTED ACTION")
-        print("toplights: ", toplights)
         print("ventilation: ", ventilation)
+        print("toplights: ", toplights)
         print("heater: ", heater)
 
         # Keep only the latest 3 data points before appending
@@ -910,7 +910,7 @@ class MiniGreenhouse(gym.Env):
             # Call the predicted inside measurements with the NN model
             self.predicted_inside_measurements_nn()
         
-        if self.flag_run_combined == True:
+        if self.flag_run_combined_models == True:
             # Combine the predicted results from the GL and NN models
             time_steps_formatted_for_combined_models = list(range(0, int(self.season_length_nn - self.first_day_nn)))
             # print("time_steps_formatted_for_combined_models 2 : ", time_steps_formatted_for_combined_models)
@@ -979,35 +979,59 @@ class MiniGreenhouse(gym.Env):
         print(f"Length of Predicted Temperature In (GRU-Combined-models): {len(self.temp_in_predicted_combined_models)}")
         print(f"Length of Predicted RH In (GRU-Combined-models): {len(self.rh_in_predicted_combined_models)}")
         print(f"Length of Predicted PAR In (GRU-Combined-models): {len(self.par_in_predicted_combined_models)}")
-                
-        # Evaluate predictions to get R² and MAE metrics
-        metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
         
-        # Save all the data in an Excel file
-        self.service_functions.export_to_excel(
-            file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
-            self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
-            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
-            self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
-        )
-        
-        # Save the metrics data in an Excel file as table format
-        self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
+        if self.action_from_drl == True and self.online_measurements == False:
+            
+            # Save all the data in an Excel file
+            self.service_functions.export_to_excel(
+                file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                None, None, None, None,
+                self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
+                self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
+            )
+            
+            # Plot the data
+            self.service_functions.plot_all_data(
+                'output/output_all_data.png', self.time_combined_models, 
+                None, None, None, None,
+                self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
+                self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
+                None, None, None)
+            
+            # Plot the rewards and actions
+            self.service_functions.plot_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
+                                                        self.heater_list)
+            
+        else:
+            # Evaluate predictions to get R² and MAE metrics
+            metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
+            
+            # Save all the data in an Excel file
+            self.service_functions.export_to_excel(
+                file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
+                self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
+                self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
+            )
+            
+            # Save the metrics data in an Excel file as table format
+            self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
 
-        # Plot the data
-        self.service_functions.plot_all_data(
-            'output/output_all_data.png', self.time_combined_models, 
-            self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
-            self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
-            self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
-            self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
-            metrics_nn, metrics_gl, metrics_combined
-        )
-        
-        # Plot the rewards and actions
-        self.service_functions.plot_rewards_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
-                                                    self.heater_list, self.rewards_list)
+            # Plot the data
+            self.service_functions.plot_all_data(
+                'output/output_all_data.png', self.time_combined_models, 
+                self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
+                self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0],
+                self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
+                self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
+                metrics_nn, metrics_gl, metrics_combined)
+            
+            # Plot the rewards and actions
+            self.service_functions.plot_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
+                                                        self.heater_list)
 
     def evaluate_predictions(self):
         '''

@@ -139,9 +139,9 @@ class ServiceFunctions:
         
         return vaporPres
 
-    def plot_rewards_actions(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list):
+    def plot_actions(self, filename, time, ventilation_list, toplights_list, heater_list):
         '''
-        Plot the rewards and actions.
+        Plot the actions.
 
         Parameters:
         - filename: Name of the output Excel file
@@ -151,8 +151,6 @@ class ServiceFunctions:
         - ventilation_list: List of actions for ventilation from DRL model or offline datasets
         - toplights_list: List of actions for toplights from DRL model or offline datasets
         - heater_list: List of actions for heater from DRL model or offline datasets
-        
-        - reward_list: List of rewards for each iterated step
         '''
 
         # Create subplots with 2 rows and 2 columns
@@ -163,12 +161,11 @@ class ServiceFunctions:
             (ventilation_list, 'Ventilation Action [-]'),
             (toplights_list, 'Toplights Action [-]'),
             (heater_list, 'Heater Action [-]'),
-            (reward_list, 'Reward [-]')
         ]
 
         # Plot each dataset in a subplot
         for ax, (y_data, title) in zip(axes.flatten(), data):
-            ax.plot(time, y_data, label=title, color='blue')  # Plot the data
+            ax.plot(time, y_data, label=title, color='black')  # Plot the data
             
             ax.set_title(title)  # Set the title for each subplot
             ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
@@ -184,10 +181,10 @@ class ServiceFunctions:
         fig.savefig(filename)
     
     def plot_all_data(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual, 
-                  co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
-                  co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
-                  co2_combined, temp_combined, rh_combined, par_combined,
-                  metrics_nn, metrics_gl, metrics_combined):
+                 co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
+                 co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
+                 co2_combined, temp_combined, rh_combined, par_combined,
+                 metrics_nn=None, metrics_gl=None, metrics_combined=None):
         '''
         Plot all the parameters to make it easier to compare predicted vs actual values.
 
@@ -214,9 +211,9 @@ class ServiceFunctions:
         - rh_combined: List of combined relative humidity predictions
         - par_combined: List of combined PAR predictions
         
-        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions
-        - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions
-        - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions
+        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions (optional)
+        - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions (optional)
+        - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions (optional)
         '''
 
         # Create subplots with 2 rows and 2 columns
@@ -224,28 +221,48 @@ class ServiceFunctions:
 
         # Data to be plotted along with their titles and predicted data
         data = [
-            (co2_actual, co2_predicted_nn, co2_predicted_gl, co2_combined, 'CO2 In [ppm]', metrics_nn['CO2'], metrics_gl['CO2'], metrics_combined['CO2']),
-            (temp_actual, temp_predicted_nn, temp_predicted_gl, temp_combined, 'Temperature In [°C]', metrics_nn['Temperature'], metrics_gl['Temperature'], metrics_combined['Temperature']),
-            (rh_actual, rh_predicted_nn, rh_predicted_gl, rh_combined, 'RH In [%]', metrics_nn['Humidity'], metrics_gl['Humidity'], metrics_combined['Humidity']),
-            (par_actual, par_predicted_nn, par_predicted_gl, par_combined, 'PAR In [W/m2]', metrics_nn['PAR'], metrics_gl['PAR'], metrics_combined['PAR'])
+            (co2_actual, co2_predicted_nn, co2_predicted_gl, co2_combined, 'CO2 In [ppm]',
+            metrics_nn['CO2'] if metrics_nn else None,
+            metrics_gl['CO2'] if metrics_gl else None,
+            metrics_combined['CO2'] if metrics_combined else None),
+            (temp_actual, temp_predicted_nn, temp_predicted_gl, temp_combined, 'Temperature In [°C]',
+            metrics_nn['Temperature'] if metrics_nn else None,
+            metrics_gl['Temperature'] if metrics_gl else None,
+            metrics_combined['Temperature'] if metrics_combined else None),
+            (rh_actual, rh_predicted_nn, rh_predicted_gl, rh_combined, 'RH In [%]',
+            metrics_nn['Humidity'] if metrics_nn else None,
+            metrics_gl['Humidity'] if metrics_gl else None,
+            metrics_combined['Humidity'] if metrics_combined else None),
+            (par_actual, par_predicted_nn, par_predicted_gl, par_combined, 'PAR In [W/m²]',
+            metrics_nn['PAR'] if metrics_nn else None,
+            metrics_gl['PAR'] if metrics_gl else None,
+            metrics_combined['PAR'] if metrics_combined else None)
         ]
 
         # Plot each dataset in a subplot
-        for ax, (y_actual, y_pred_nn, y_pred_gl, y_combined, title, metrics_nn, metrics_gl, metrics_combined) in zip(axes.flatten(), data):
-            ax.plot(time, y_actual, label='Actual', color='blue')  # Plot actual data
-            ax.plot(time, y_pred_nn, label='Predicted NN', color='purple', linestyle='--')  # Plot NN predicted data
-            ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')  # Plot GL predicted data
-            ax.plot(time, y_combined, label='Predicted Combined', color='red', linestyle='-.')  # Plot combined predicted data
+        for ax, (y_actual, y_pred_nn, y_pred_gl, y_combined, title, nn_metrics, gl_metrics, combined_metrics) in zip(axes.flatten(), data):
+            # Plot actual data if it is not None
+            if y_actual is not None:
+                ax.plot(time, y_actual, label='Actual', color='blue')
             
-            # Add RMSE, RRMSE, and ME to the title
-            ax.set_title(f"{title}\nNN RMSE: {metrics_nn[0]:.4f}, RRMSE: {metrics_nn[1]:.4f}, ME: {metrics_nn[2]:.4f}\n"
-                        f"GL RMSE: {metrics_gl[0]:.4f}, RRMSE: {metrics_gl[1]:.4f}, ME: {metrics_gl[2]:.4f}\n"
-                        f"Combined RMSE: {metrics_combined[0]:.4f}, RRMSE: {metrics_combined[1]:.4f}, ME: {metrics_combined[2]:.4f}")
-            
-            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
-            ax.set_ylabel(title)  # Set the y-axis label
-            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
-            ax.legend()  # Add legend to distinguish between actual and predicted data
+            # Plot predicted data
+            ax.plot(time, y_pred_nn, label='Predicted NN', color='purple', linestyle='--')
+            ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')
+            ax.plot(time, y_combined, label='Predicted Combined', color='red', linestyle='-.')
+
+            # Add RMSE, RRMSE, and ME to the title if metrics are available
+            if nn_metrics and gl_metrics and combined_metrics:
+                ax.set_title(f"{title}\n"
+                            f"NN RMSE: {nn_metrics[0]:.4f}, RRMSE: {nn_metrics[1]:.4f}, ME: {nn_metrics[2]:.4f}\n"
+                            f"GL RMSE: {gl_metrics[0]:.4f}, RRMSE: {gl_metrics[1]:.4f}, ME: {gl_metrics[2]:.4f}\n"
+                            f"Combined RMSE: {combined_metrics[0]:.4f}, RRMSE: {combined_metrics[1]:.4f}, ME: {combined_metrics[2]:.4f}")
+            else:
+                ax.set_title(f"{title}")
+
+            ax.set_xlabel('Timesteps [5 minutes / -]')
+            ax.set_ylabel(title)
+            ax.tick_params(axis='x', rotation=45)
+            ax.legend()
 
         # Adjust the layout to prevent overlap
         plt.tight_layout()
@@ -255,10 +272,10 @@ class ServiceFunctions:
         fig.savefig(filename)
 
     def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
-                    co2_actual, temp_actual, rh_actual, par_actual,
-                    co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
-                    co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl,
-                    co2_predicted_combined, temp_predicted_combined, rh_predicted_combined, par_predicted_combined):
+                        co2_actual=None, temp_actual=None, rh_actual=None, par_actual=None,
+                        co2_predicted_nn=None, temp_predicted_nn=None, rh_predicted_nn=None, par_predicted_nn=None,
+                        co2_predicted_gl=None, temp_predicted_gl=None, rh_predicted_gl=None, par_predicted_gl=None,
+                        co2_predicted_combined=None, temp_predicted_combined=None, rh_predicted_combined=None, par_predicted_combined=None):
         '''
         Export all the appended data to an Excel file including both actual and predicted values.
 
@@ -270,20 +287,20 @@ class ServiceFunctions:
         - heater_list: List of action for heater from DRL model or offline datasets
         - reward_list: List of reward for iterated step
         
-        - co2_in_excel: List of actual CO2 values
-        - temp_in_excel: List of actual temperature values
-        - rh_in_excel: List of actual relative humidity values
-        - par_in_excel: List of actual PAR values
+        - co2_actual: List of actual CO2 values (optional)
+        - temp_actual: List of actual temperature values (optional)
+        - rh_actual: List of actual relative humidity values (optional)
+        - par_actual: List of actual PAR values (optional)
         
-        - co2_in_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_in_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_in_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_in_predicted_nn: List of predicted PAR values from Neural Network
+        - co2_predicted_nn: List of predicted CO2 values from Neural Network
+        - temp_predicted_nn: List of predicted temperature values from Neural Network
+        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
+        - par_predicted_nn: List of predicted PAR values from Neural Network
         
-        - co2_in_predicted_gl: List of predicted CO2 values from Generalized Linear Model
-        - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
-        - rh_in_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
-        - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        - co2_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_predicted_gl: List of predicted PAR values from Generalized Linear Model
         
         - co2_predicted_combined: List of combined predicted CO2 values
         - temp_predicted_combined: List of combined predicted temperature values
@@ -291,29 +308,36 @@ class ServiceFunctions:
         - par_predicted_combined: List of combined predicted PAR values
         '''
 
+        # Prepare the data dictionary with always-included columns
         data = {
-            'Timesteps [5 minutes / -]':time,
+            'Timesteps [5 minutes / -]': time,
             'Action Ventilation': ventilation_list,
             'Action Toplights': toplights_list,
             'Action Heater': heater_list,
             'Rewards': reward_list,
-            'CO2 In (Actual)': co2_actual,
             'CO2 In (Predicted NN)': co2_predicted_nn,
             'CO2 In (Predicted GL)': co2_predicted_gl,
             'CO2 In (Predicted Combined)': co2_predicted_combined,
-            'Temperature In (Actual)': temp_actual,
             'Temperature In (Predicted NN)': temp_predicted_nn,
             'Temperature In (Predicted GL)': temp_predicted_gl,
             'Temperature In (Predicted Combined)': temp_predicted_combined,
-            'RH In (Actual)': rh_actual,
             'RH In (Predicted NN)': rh_predicted_nn,
             'RH In (Predicted GL)': rh_predicted_gl,
             'RH In (Predicted Combined)': rh_predicted_combined,
-            'PAR In (Actual)': par_actual,
             'PAR In (Predicted NN)': par_predicted_nn,
             'PAR In (Predicted GL)': par_predicted_gl,
             'PAR In (Predicted Combined)': par_predicted_combined,
         }
+
+        # Add actual data columns only if they are not None
+        if co2_actual is not None:
+            data['CO2 In (Actual)'] = co2_actual
+        if temp_actual is not None:
+            data['Temperature In (Actual)'] = temp_actual
+        if rh_actual is not None:
+            data['RH In (Actual)'] = rh_actual
+        if par_actual is not None:
+            data['PAR In (Actual)'] = par_actual
 
         # Check if all lists have the same length
         lengths = [len(v) for v in data.values()]

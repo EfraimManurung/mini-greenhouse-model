@@ -228,7 +228,7 @@ class ServiceFunctions:
         plt.show()
         
         # Save the plot to a file
-        fig.savefig(filename)
+        fig.savefig(filename, dpi=1000)
 
     def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
                         co2_actual=None, temp_actual=None, rh_actual=None, par_actual=None,
@@ -336,7 +336,7 @@ class ServiceFunctions:
         for ax, (y_data, title) in zip(axes, data):
             ax.plot(time, y_data, label=title, color='green')  # Plot the data
             
-            ax.set_title(title)  # Set the title for each subplot
+            # ax.set_title(title)  # Set the title for each subplot
             ax.set_xlabel('Timesteps [5 minutes]')  # Set the x-axis label
             ax.set_ylabel(title)  # Set the y-axis label
             ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
@@ -347,7 +347,7 @@ class ServiceFunctions:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename)
+        fig.savefig(filename, dpi=1000)
     
     import matplotlib.pyplot as plt
 
@@ -390,7 +390,7 @@ class ServiceFunctions:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename)
+        fig.savefig(filename, dpi=1000)
     
     def export_rewards_to_excel(self, filename, time, rewards_list):
         '''

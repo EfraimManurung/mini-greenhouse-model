@@ -975,7 +975,7 @@ class MiniGreenhouse(gym.Env):
                                                         self.heater_list)
             
             # Plot the rewards
-            self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
+            # self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
             
         else:
             # Evaluate predictions to get R² and MAE metrics
@@ -1010,7 +1010,7 @@ class MiniGreenhouse(gym.Env):
                                                         self.heater_list)
             
             # Plot the rewards
-            self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
+            # self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
             
 
     def evaluate_predictions(self):

@@ -138,47 +138,6 @@ class ServiceFunctions:
         vaporPres = _satP * _rh
         
         return vaporPres
-
-    def plot_actions(self, filename, time, ventilation_list, toplights_list, heater_list):
-        '''
-        Plot the actions.
-
-        Parameters:
-        - filename: Name of the output Excel file
-        
-        - time: List of time values
-        
-        - ventilation_list: List of actions for ventilation from DRL model or offline datasets
-        - toplights_list: List of actions for toplights from DRL model or offline datasets
-        - heater_list: List of actions for heater from DRL model or offline datasets
-        '''
-
-        # Create subplots with 2 rows and 2 columns
-        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 12))
-
-        # Data to be plotted along with their titles
-        data = [
-            (ventilation_list, 'Ventilation Action [-]'),
-            (toplights_list, 'Toplights Action [-]'),
-            (heater_list, 'Heater Action [-]'),
-        ]
-
-        # Plot each dataset in a subplot
-        for ax, (y_data, title) in zip(axes.flatten(), data):
-            ax.plot(time, y_data, label=title, color='black')  # Plot the data
-            
-            ax.set_title(title)  # Set the title for each subplot
-            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
-            ax.set_ylabel(title)  # Set the y-axis label
-            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
-            ax.legend()  # Add legend to each subplot
-
-        # Adjust the layout to prevent overlap
-        plt.tight_layout()
-        plt.show()
-
-        # Save the plot to a file
-        fig.savefig(filename)
     
     def plot_all_data(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual, 
                  co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn,
@@ -349,37 +308,116 @@ class ServiceFunctions:
         df.to_excel(filename, index=False)
         print(f"Data successfully exported to {filename}")
 
-    def format_data_in_JSON(self, time, ventilation, toplights, heater):
+    def plot_actions(self, filename, time, ventilation_list, toplights_list, heater_list):
         '''
-        Convert data to JSON format and print it.
-        
-        Parameters:
-        - time: List of time values
-        - ventilation: List of ventilation control values
-        - toplights: List of toplights control values
-        - heater: List of heater control values
-        '''
-        
-        def convert_to_native(value):
-            if isinstance(value, np.ndarray):
-                return value.tolist()
-            elif isinstance(value, (np.int32, np.int64, np.float32, np.float64)):
-                return value.item()
-            else:
-                return value
+        Plot the actions.
 
+        Parameters:
+        - filename: Name of the output file
+        
+        - time: List of time values
+        
+        - ventilation_list: List of actions for ventilation from DRL model or offline datasets
+        - toplights_list: List of actions for toplights from DRL model or offline datasets
+        - heater_list: List of actions for heater from DRL model or offline datasets
+        '''
+
+        # Create subplots
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(18, 6))
+
+        # Data to be plotted along with their titles
+        data = [
+            (ventilation_list, 'Ventilation Action [-]'),
+            (toplights_list, 'Toplights Action [-]'),
+            (heater_list, 'Heater Action [-]'),
+        ]
+
+        # Plot each dataset in a subplot
+        for ax, (y_data, title) in zip(axes, data):
+            ax.plot(time, y_data, label=title, color='red')  # Plot the data
+            
+            ax.set_title(title)  # Set the title for each subplot
+            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
+            ax.set_ylabel(title)  # Set the y-axis label
+            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
+            ax.legend()  # Add legend to each subplot
+
+        # Adjust the layout to prevent overlap
+        plt.tight_layout()
+        plt.show()
+
+        # Save the plot to a file
+        fig.savefig(filename)
+    
+    import matplotlib.pyplot as plt
+
+    def plot_rewards(self, filename, time, rewards_list):
+        '''
+        Plot the rewards and cumulative rewards.
+
+        Parameters:
+        - filename: Name of the output file
+        
+        - time: List of time values
+        
+        - rewards_list: List of rewards per timestep
+        '''
+
+        # Calculate cumulative rewards
+        cumulative_rewards = [sum(rewards_list[:i+1]) for i in range(len(rewards_list))]
+
+        # Create subplots
+        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(18, 8))
+
+        # Plot rewards per timestep
+        axes[0].plot(time, rewards_list, label='Rewards per Timestep', color='blue')
+        axes[0].set_title('Rewards per Timestep')
+        axes[0].set_xlabel('Timesteps [5 minutes / -]')
+        axes[0].set_ylabel('Reward')
+        axes[0].tick_params(axis='x', rotation=45)
+        axes[0].legend()
+
+        # Plot cumulative rewards
+        axes[1].plot(time, cumulative_rewards, label='Cumulative Rewards', color='green')
+        axes[1].set_title('Cumulative Rewards')
+        axes[1].set_xlabel('Timesteps [5 minutes / -]')
+        axes[1].set_ylabel('Cumulative Reward')
+        axes[1].tick_params(axis='x', rotation=45)
+        axes[1].legend()
+
+        # Adjust the layout to prevent overlap
+        plt.tight_layout()
+        plt.show()
+
+        # Save the plot to a file
+        fig.savefig(filename)
+    
+    def export_rewards_to_excel(self, filename, time, rewards_list):
+        '''
+        Export the rewards per timestep and cumulative rewards to an Excel file.
+
+        Parameters:
+        - filename: Name of the output Excel file
+        
+        - time: List of time values
+        
+        - rewards_list: List of rewards per timestep
+        '''
+
+        # Calculate cumulative rewards
+        cumulative_rewards = [sum(rewards_list[:i+1]) for i in range(len(rewards_list))]
+
+        # Prepare the data dictionary
         data = {
-            "time": [convert_to_native(v) for v in time],
-            "ventilation": [convert_to_native(v) for v in ventilation],
-            "toplights": [convert_to_native(v) for v in toplights],
-            "heater": [convert_to_native(v) for v in heater]
+            'Timesteps [5 minutes / -]': time,
+            'Rewards per Timestep': rewards_list,
+            'Cumulative Rewards': cumulative_rewards,
         }
 
-        json_data = json.dumps(data, indent=4)
-        
-        # For debugging JSON data
-        # print("JSON DATA: ", json_data)
-        return json_data
+        # Create a DataFrame and export to Excel
+        df = pd.DataFrame(data)
+        df.to_excel(filename, index=False)
+        print(f"Rewards data successfully exported to {filename}")
     
     def export_evaluated_data_to_excel_table(self, filename, metrics_nn, metrics_gl, metrics_combined):
         '''
@@ -431,6 +469,38 @@ class ServiceFunctions:
         # Export the DataFrame to an Excel file
         df_metrics.to_excel(filename, index=False)
         print(f"Metrics successfully exported to {filename}")
+    
+    def format_data_in_JSON(self, time, ventilation, toplights, heater):
+        '''
+        Convert data to JSON format and print it.
+        
+        Parameters:
+        - time: List of time values
+        - ventilation: List of ventilation control values
+        - toplights: List of toplights control values
+        - heater: List of heater control values
+        '''
+        
+        def convert_to_native(value):
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+            elif isinstance(value, (np.int32, np.int64, np.float32, np.float64)):
+                return value.item()
+            else:
+                return value
+
+        data = {
+            "time": [convert_to_native(v) for v in time],
+            "ventilation": [convert_to_native(v) for v in ventilation],
+            "toplights": [convert_to_native(v) for v in toplights],
+            "heater": [convert_to_native(v) for v in heater]
+        }
+
+        json_data = json.dumps(data, indent=4)
+        
+        # For debugging JSON data
+        # print("JSON DATA: ", json_data)
+        return json_data
     
     def publish_mqtt_data(self, json_data, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/drl-controls"):
         '''

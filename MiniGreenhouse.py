@@ -39,7 +39,6 @@ from gymnasium.spaces import Box
 import numpy as np
 import scipy.io as sio
 import os
-from datetime import timedelta
 import pandas as pd
 
 # IMPORT LIBRARIES for the matlab file
@@ -57,6 +56,13 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error
+
+# Suppress specific TensorFlow warnings
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
+
+# Set TensorFlow logging level to ERROR
+tf.get_logger().setLevel('ERROR')
 
 class MiniGreenhouse(gym.Env):
     '''
@@ -491,13 +497,7 @@ class MiniGreenhouse(gym.Env):
             scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
         except Exception as e:
             raise ValueError(f"Failed to load the scaler: {e}")
-        
-        # # Load the model using the native Keras format
-        # loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
-        
-        # # Load the scaler
-        # scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
-            
+                    
         # Scale the input features
         X_features_scaled = scaler.transform(X_features)
         
@@ -512,8 +512,6 @@ class MiniGreenhouse(gym.Env):
         Predicted inside measurements
         
         '''
-        # Load the updated data from the excel file
-        # self.load_excel_or_mqtt_data(_action_drl)
     
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
         new_par_in_predicted_nn = self.predict_inside_measurements_nn('global in', self.step_data)
@@ -527,30 +525,14 @@ class MiniGreenhouse(gym.Env):
             self.temp_in_predicted_nn = new_temp_in_predicted_nn
             self.rh_in_predicted_nn = new_rh_in_predicted_nn
             self.co2_in_predicted_nn = new_co2_in_predicted_nn
-            
-            # For debugging
-            # print("LENGTH self.par_in_predicted", len(self.par_in_predicted_nn))
-            # print("LENGTH self.temp_in_predicted", len(self.temp_in_predicted_nn))
-            # print("LENGTH self.rh_in_predicted", len(self.rh_in_predicted_nn))
-            # print("LENGTH self.co2_in_predicted", len(self.co2_in_predicted_nn))
+    
         else:
             # Concatenate new data with existing data
             self.par_in_predicted_nn = np.concatenate((self.par_in_predicted_nn, new_par_in_predicted_nn))
             self.temp_in_predicted_nn = np.concatenate((self.temp_in_predicted_nn, new_temp_in_predicted_nn))
             self.rh_in_predicted_nn = np.concatenate((self.rh_in_predicted_nn, new_rh_in_predicted_nn))
             self.co2_in_predicted_nn = np.concatenate((self.co2_in_predicted_nn, new_co2_in_predicted_nn))
-            
-            # For debugging
-            # print("self.par_in_predicted", self.par_in_predicted)
-            # print("self.temp_in_predicted", self.temp_in_predicted)
-            # print("self.rh_in_predicted", self.rh_in_predicted)
-            # print("self.co2_in_predicted", self.co2_in_predicted)
-            
-            # print("LENGTH self.par_in_predicted_nn", len(self.par_in_predicted_nn))
-            # print("LENGTH self.temp_in_predicted_nn", len(self.temp_in_predicted_nn))
-            # print("LENGTH self.rh_in_predicted_nn", len(self.rh_in_predicted_nn))
-            # print("LENGTH self.co2_in_predicted_nn", len(self.co2_in_predicted_nn))
-    
+                
     def predicted_inside_measurements_gl(self):
         '''
         Load data from the .mat file.
@@ -618,27 +600,8 @@ class MiniGreenhouse(gym.Env):
         Returns:
         array: The observation space of the environment.
         '''
-        
-        # return np.array([
-        #     self.co2_in[-1],
-        #     self.temp_in[-1],
-        #     self.rh_in[-1],
-        #     self.global_in[-1],
-        #     self.global_out[-1],
-        #     self.temp_out[-1],
-        #     self.rh_out[-1],
-        #     self.toplights[-1],
-        #     self.ventilation[-1],
-        #     self.heater[-1],
-        #     self.par_in_predicted[-1][0],  # Ensure this is a scalar value
-        #     self.temp_in_predicted[-1][0], # Ensure this is a scalar value
-        #     self.rh_in_predicted[-1][0],   # Ensure this is a scalar value
-        #     self.co2_in_predicted[-1][0]   # Ensure this is a scalar value
-        # ], np.float32)
-        
-        # TO-DO: Make the observation from the combined model
+    
         if self.flag_run_combined_models == True:
-            # if self.current_step > 0:
                 
             # print the predict measurements using the GRU model
             print("PRINT THE OBSERVATION BASED ON THE COMBINED MODELS")
@@ -982,7 +945,7 @@ class MiniGreenhouse(gym.Env):
         
         if self.action_from_drl == True and self.online_measurements == False:
             
-            # Save all the data in an Excel file
+            # Save all the data (included the actions) in an Excel file
             self.service_functions.export_to_excel(
                 file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
                 None, None, None, None,
@@ -990,6 +953,9 @@ class MiniGreenhouse(gym.Env):
                 self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl,
                 self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models
             )
+            
+            # Save the rewards list 
+            self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
             
             # Plot the data
             self.service_functions.plot_all_data(
@@ -1000,9 +966,12 @@ class MiniGreenhouse(gym.Env):
                 self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
                 None, None, None)
             
-            # Plot the rewards and actions
-            self.service_functions.plot_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
+            # Plot the actions
+            self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
                                                         self.heater_list)
+            
+            # Plot the rewards
+            self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
             
         else:
             # Evaluate predictions to get R² and MAE metrics
@@ -1020,6 +989,9 @@ class MiniGreenhouse(gym.Env):
             # Save the metrics data in an Excel file as table format
             self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
 
+            # Save the rewards list 
+            self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
+            
             # Plot the data
             self.service_functions.plot_all_data(
                 'output/output_all_data.png', self.time_combined_models, 
@@ -1029,9 +1001,13 @@ class MiniGreenhouse(gym.Env):
                 self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models,
                 metrics_nn, metrics_gl, metrics_combined)
             
-            # Plot the rewards and actions
-            self.service_functions.plot_actions('output/output_rewards_action.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
+            # Plot the actions
+            self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
                                                         self.heater_list)
+            
+            # Plot the rewards
+            self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
+            
 
     def evaluate_predictions(self):
         '''
@@ -1217,20 +1193,12 @@ class MiniGreenhouse(gym.Env):
             'PAR In (Predicted NN)': self.par_in_predicted_nn[:, 0]
         })
         
-        # print("DATA INPUT!!! : \n", data_input)
-
         # Predict inside measurements using the GRU model
         new_time_combined = data_input['timesteps'][-4:]
         new_par_in_predicted_combined = self.predict_inside_measurements_gru("PAR In", data_input)[-4:]
         new_temp_in_predicted_combined = self.predict_inside_measurements_gru("Temperature In", data_input)[-4:]
         new_rh_in_predicted_combined = self.predict_inside_measurements_gru("RH In", data_input)[-4:]
         new_co2_in_predicted_combined = self.predict_inside_measurements_gru("CO2 In", data_input)[-4:]
-        
-        # Predict measurements using GRU model
-        # self.co2_in_combined_models = self.predict_inside_measurements_gru("CO2 In", data_input)
-        # self.temp_in_combined_models = self.predict_inside_measurements_gru("Temperature In", data_input)
-        # self.rh_in_combined_models = self.predict_inside_measurements_gru("RH In", data_input)
-        # self.par_in_combined_models = self.predict_inside_measurements_gru("PAR In", data_input)
         
         # Check if instance variables already exist; if not, initialize them
         if not hasattr(self, 'time_combined_models'):
@@ -1245,22 +1213,6 @@ class MiniGreenhouse(gym.Env):
             self.temp_in_predicted_combined_models = np.concatenate((self.temp_in_predicted_combined_models, new_temp_in_predicted_combined))
             self.rh_in_predicted_combined_models = np.concatenate((self.rh_in_predicted_combined_models, new_rh_in_predicted_combined))
             self.par_in_predicted_combined_models = np.concatenate((self.par_in_predicted_combined_models, new_par_in_predicted_combined))
-
-        # Print shapes of the arrays to debug
-        # print("Shapes of input arrays:")
-        # print(f"timesteps: {_timesteps}")
-        # print(f"CO2 In (Predicted GL): {self.co2_in_predicted_gl.shape}")
-        # print(f"CO2 In (Predicted NN): {self.co2_in_predicted_nn.shape}")
-        # print(f"CO2 In (Predicted GRU - combined models): {self.co2_in_predicted_combined_models.shape}")
-        # print(f"Temperature In (Predicted GL): {self.temp_in_predicted_gl.shape}")
-        # print(f"Temperature In (Predicted NN): {self.temp_in_predicted_nn.shape}")
-        # print(f"Temperature In (Predicted GRU - combined models): {self.temp_in_predicted_combined_models.shape}")
-        # print(f"RH In (Predicted GL): {self.rh_in_predicted_gl.shape}")
-        # print(f"RH In (Predicted NN): {self.rh_in_predicted_nn.shape}")
-        # print(f"RH In (Predicted GRU - combined models): {self.rh_in_predicted_combined_models.shape}")
-        # print(f"PAR In (Predicted GL): {self.par_in_predicted_gl.shape}")
-        # print(f"PAR In (Predicted NN): {self.par_in_predicted_nn.shape}")
-        # print(f"PAR In (Predicted GRU - combined models): {self.par_in_predicted_combined_models.shape}")
         
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):

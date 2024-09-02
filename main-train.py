@@ -1,19 +1,25 @@
+import tensorflow as tf
+
+# Enable eager execution
+tf.config.run_functions_eagerly(True)
+
 # Import RLlib algorithms
-# Configure.
 from ray.rllib.algorithms.ppo import PPOConfig
 
 # Import the custom environment
 from MiniGreenhouse import MiniGreenhouse
 
 # Import support libraries
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
 
 # Configure the RLlib PPO algorithm
 config = PPOConfig()
-config.rollouts(num_rollout_workers=1)
-config.resources(num_cpus_per_worker=1)
+
+# Algorithm config to run the env_runners
+config.env_runners(num_env_runners=1)
+config.env_runners(num_cpus_per_env_runner=1)
+
 config.environment(
     env=MiniGreenhouse,
         env_config={"flag_run": False,
@@ -30,8 +36,8 @@ config.environment(
                     })
 
 config.training(
-    gamma=0.9,  # Discount factor
-        lr=0.0001, #lr = 0.1,  # Learning rate
+        gamma=0.9,  # Discount factor
+        lr=0.001, #lr = 0.1,  # Learning rate
         kl_coeff=0.3,  # KL divergence coefficient
         # model={
         #     "fcnet_hiddens": [256, 256, 256],  # Hidden layer configuration
@@ -43,9 +49,6 @@ config.training(
         sgd_minibatch_size=1
 )
 
-# # Build the algorithm object
-# algo = config.build()
-
 # Build the algorithm object
 try:
     algo = config.build()
@@ -53,11 +56,8 @@ except Exception as e:
     raise RuntimeError(f"Failed to build the PPO algorithm: {e}")
 
 # Train the algorithm
-for episode in tqdm(range(10)):  # Train for 250 episodes
+for episode in tqdm(range(1080)):  # Train for 250 episodes
     result = algo.train()  # Perform training
-    # if episode % 5 == 0:  # Save a checkpoint every 5 episodes
-    #     checkpoint_dir = algo.save().checkpoint.path
-    #     print(f"Checkpoint saved in directory {checkpoint_dir}")
         
 # Save the model checkpoint
 save_result = algo.save('trained-drl-models/model-calibrator-config-1')

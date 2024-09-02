@@ -20,14 +20,16 @@ Table 1 Meaning of the state x(t), measurement y(t), control signal u(t) and dis
  d2(t) Outdoor CO2 (ppm)						 u2(t) Toplighting status (-)
  d3(t) Outdoor temperature (◦C)					 u3(t) Heating (-) 
  
- based on Table 1, we want to predict the state variable x(t) with control signal u(t) and disturbance d(t)
+based on Table 1, we want to predict the state variable x(t) with control signal u(t) and disturbance d(t)
  
- Project sources:
+Project sources:
     - Tensor flow
     - 
 Other sources:
     -
     -
+References:
+    - 
 '''
 
 # IMPORT LIBRARIES for DRL model 
@@ -49,7 +51,6 @@ from utils.ServiceFunctions import ServiceFunctions
 
 # IMPORT LIBRARIES for NN and GRU models
 import tensorflow as tf
-tf.config.run_functions_eagerly(True)
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Layer
 import joblib
@@ -63,6 +64,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 
 # Set TensorFlow logging level to ERROR
 tf.get_logger().setLevel('ERROR')
+
+# For the tf.data.Dataset only supports Python-style environment
+tf.compat.v1.enable_eager_execution()
 
 class MiniGreenhouse(gym.Env):
     '''
@@ -202,11 +206,13 @@ class MiniGreenhouse(gym.Env):
             - temp_in: Temperature inside the mini-greenhouse [°C]
             - rh_in: Relative humidity in percentage in the mini-greenhouse [%]
             - PAR_in: Global radiation inside the mini-greenhouse [W m^{-2}]
+            - fruit_dw: Carbohydrates in fruit dry weight [mg{CH2O} m^{-2}]             Equation 2, 3 [2], Equation A44 [5]
+            - fruit_tcansum: Crop development stage [°C day]                            Equation 8 [2]
+            
+        Not included:
             - fruit_leaf: Carbohydrates in leaves [mg{CH2O} m^{-2}]                     Equation 4, 5 [2]
             - fruit_stem: Carbohydrates in stem [mg{CH2O} m^{-2}]                       Equation 6, 7 [2]
-            - fruit_dw: Carbohydrates in fruit dry weight [mg{CH2O} m^{-2}]             Equation 2, 3 [2], Equation A44 [5]
             - fruit_cbuf: Carbohydrates in buffer [mg{CH2O} m^{-2}]                     Equation 1, 2 [2]
-            - fruit_tcansum: Crop development stage [°C day]                            Equation 8 [2]
         
         The state x(t) variables:
         - Temperature (°C) 
@@ -217,8 +223,8 @@ class MiniGreenhouse(gym.Env):
         
         # Define observation and action spaces
         self.observation_space = Box(
-            low=np.array([0.0, 10.00, 0.00, 0.00, 0, 0, 0, -10.00, -10.00]), # In order: CO2, Temperature, Humidity, PAR-in, Fruit Leaf, Fruit Stem, and Fruit Dry Weight
-            high=np.array([2000.0, 30.00, 90.00, 25.00, np.inf, np.inf, np.inf, np.inf, np.inf]), 
+            low=np.array([0.0, 10.00, 0.00, 0.00, 0.00, 0.00]),  #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, and fruit_tcansum
+            high=np.array([2000.0, 30.00, 90.00, 25.00, np.inf, np.inf]), 
             dtype=np.float64
         )
         
@@ -450,7 +456,8 @@ class MiniGreenhouse(gym.Env):
 
             # Debugging
             print("Step Data (offline):", self.step_data.head())
-            
+    
+    # @tf.function
     def predict_inside_measurements_nn(self, target_variable, data_input):
         '''
         Predict the measurements or state variables inside mini-greenhouse 
@@ -610,28 +617,25 @@ class MiniGreenhouse(gym.Env):
             print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
             print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
             
+            # in otder: co2_in, temp_in, rh_in, PAR_in, fruit_dw, and fruit_tcansum
             return np.array([
                 self.co2_in_predicted_combined_models[-1],      # use combined models for the observation
                 self.temp_in_predicted_combined_models[-1],     # use combined models for the observation
                 self.rh_in_predicted_combined_models[-1],       # use combined models for the observation
                 self.par_in_predicted_combined_models[-1],      # use combined models for the observation
-                self.fruit_leaf_predicted_gl[-1],
-                self.fruit_stem_predicted_gl[-1],
                 self.fruit_dw_predicted_gl[-1],
-                self.fruit_cbuf_predicted_gl[-1],
                 self.fruit_tcansum_predicted_gl[-1]
             ], np.float32) 
                 
         else:
+            
+            # in otder: co2_in, temp_in, rh_in, PAR_in, fruit_dw, and fruit_tcansum
             return np.array([
                 self.co2_in_predicted_gl[-1],
                 self.temp_in_predicted_gl[-1],
                 self.rh_in_predicted_gl[-1],
                 self.par_in_predicted_gl[-1],
-                self.fruit_leaf_predicted_gl[-1],
-                self.fruit_stem_predicted_gl[-1],
                 self.fruit_dw_predicted_gl[-1],
-                self.fruit_cbuf_predicted_gl[-1],
                 self.fruit_tcansum_predicted_gl[-1]
             ], np.float32) 
 

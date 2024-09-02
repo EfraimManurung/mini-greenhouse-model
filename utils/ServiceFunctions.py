@@ -218,7 +218,7 @@ class ServiceFunctions:
             else:
                 ax.set_title(f"{title}")
 
-            ax.set_xlabel('Timesteps [5 minutes / -]')
+            ax.set_xlabel('Timesteps [5 minutes]')
             ax.set_ylabel(title)
             ax.tick_params(axis='x', rotation=45)
             ax.legend()
@@ -269,7 +269,7 @@ class ServiceFunctions:
 
         # Prepare the data dictionary with always-included columns
         data = {
-            'Timesteps [5 minutes / -]': time,
+            'Timesteps [5 minutes]': time,
             'Action Ventilation': ventilation_list,
             'Action Toplights': toplights_list,
             'Action Heater': heater_list,
@@ -334,10 +334,10 @@ class ServiceFunctions:
 
         # Plot each dataset in a subplot
         for ax, (y_data, title) in zip(axes, data):
-            ax.plot(time, y_data, label=title, color='red')  # Plot the data
+            ax.plot(time, y_data, label=title, color='green')  # Plot the data
             
             ax.set_title(title)  # Set the title for each subplot
-            ax.set_xlabel('Timesteps [5 minutes / -]')  # Set the x-axis label
+            ax.set_xlabel('Timesteps [5 minutes]')  # Set the x-axis label
             ax.set_ylabel(title)  # Set the y-axis label
             ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for readability
             ax.legend()  # Add legend to each subplot
@@ -372,7 +372,7 @@ class ServiceFunctions:
         # Plot rewards per timestep
         axes[0].plot(time, rewards_list, label='Rewards per Timestep', color='blue')
         axes[0].set_title('Rewards per Timestep')
-        axes[0].set_xlabel('Timesteps [5 minutes / -]')
+        axes[0].set_xlabel('Timesteps [5 minutes]')
         axes[0].set_ylabel('Reward')
         axes[0].tick_params(axis='x', rotation=45)
         axes[0].legend()
@@ -380,7 +380,7 @@ class ServiceFunctions:
         # Plot cumulative rewards
         axes[1].plot(time, cumulative_rewards, label='Cumulative Rewards', color='green')
         axes[1].set_title('Cumulative Rewards')
-        axes[1].set_xlabel('Timesteps [5 minutes / -]')
+        axes[1].set_xlabel('Timesteps [5 minutes]')
         axes[1].set_ylabel('Cumulative Reward')
         axes[1].tick_params(axis='x', rotation=45)
         axes[1].legend()
@@ -409,7 +409,7 @@ class ServiceFunctions:
 
         # Prepare the data dictionary
         data = {
-            'Timesteps [5 minutes / -]': time,
+            'Timesteps [5 minutes]': time,
             'Rewards per Timestep': rewards_list,
             'Cumulative Rewards': cumulative_rewards,
         }

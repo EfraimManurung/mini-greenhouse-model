@@ -9,6 +9,7 @@ efraim.manurung@gmail.com
 '''
 
 import tensorflow as tf
+
 # Enable eager execution
 tf.config.run_functions_eagerly(True)
 
@@ -19,9 +20,6 @@ from ray.rllib.algorithms.algorithm import Algorithm
 import time
 import matplotlib.pyplot as plt  # Import matplotlib for plotting
 
-# Import libraries needed for PPO algorithm
-from ray.rllib.algorithms.ppo import PPOConfig
-
 # Assuming the NeuralNetworksModel class is defined as provided
 from MiniGreenhouse import MiniGreenhouse
 
@@ -29,7 +27,7 @@ from MiniGreenhouse import MiniGreenhouse
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-1')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
 
 # Make the calibratorModel instance
 env = MiniGreenhouse({"flag_run": True,
@@ -42,7 +40,7 @@ env = MiniGreenhouse({"flag_run": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,
                         "flag_run_combined_models": True,
-                        "max_steps": 3
+                        "max_steps": 6
                         })
 
 # Get the initial observation (should be: [0.0] for the starting position).

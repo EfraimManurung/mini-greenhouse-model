@@ -26,7 +26,7 @@ class DataPlotter:
         '''
 
         # Create subplots
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(18, 6))
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(9, 6))
 
         # Data to be plotted along with their titles
         data = [
@@ -50,18 +50,18 @@ class DataPlotter:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename, dpi=1000)
+        fig.savefig(filename, dpi=500)
 
 def main():
     # Read the Excel file into a DataFrame
-    filepath = 'output_simulated_data_offline.xlsx'  # Replace with the path to your Excel file
+    filepath = 'output_simulated_data_online.xlsx'  # Replace with the path to your Excel file
     df = pd.read_excel(filepath)
     
     # Initialize the DataPlotter with the DataFrame
     plotter = DataPlotter(df)
     
     plotter.plot_actions(
-        filename='actions_plot.png',
+        filename='actions_plot_online.png',
         time = plotter.time,
         ventilation_list = plotter.ventilation,
         toplights_list = plotter.toplights,

@@ -49,7 +49,7 @@ import matlab.engine
 # Import service functions
 from utils.ServiceFunctions import ServiceFunctions
 
-# IMPORT LIBRARIES for NN and GRU models
+# IMPORT LIBRARIES for NN and LSTM models
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Layer
@@ -99,7 +99,7 @@ class MiniGreenhouse(gym.Env):
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
         self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
-        self.flag_run_combined_models = env_config.get("flag_run_combined_models", True) # Default is true, flag to run the GRU model
+        self.flag_run_combined_models = env_config.get("flag_run_combined_models", True) # Default is true, flag to run the LSTM model
         
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 3) # One episode = 3 steps = 1 hour, because 1 step = 20 minutes
@@ -610,7 +610,7 @@ class MiniGreenhouse(gym.Env):
     
         if self.flag_run_combined_models == True:
                 
-            # print the predict measurements using the GRU model
+            # print the predict measurements using the LSTM model
             print("PRINT THE OBSERVATION BASED ON THE COMBINED MODELS")
             print("self.co2_in_predicted_combined_models :", self.co2_in_predicted_combined_models[-1])
             print("self.temp_in_predicted_combined_models : ", self.temp_in_predicted_combined_models[-1])
@@ -942,10 +942,10 @@ class MiniGreenhouse(gym.Env):
         print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
         print(f"Length of Predicted PAR In (GL): {len(self.par_in_predicted_gl)}")
-        print(f"Length of Predicted CO2 In (GRU-Combined-models): {len(self.co2_in_predicted_combined_models)}")
-        print(f"Length of Predicted Temperature In (GRU-Combined-models): {len(self.temp_in_predicted_combined_models)}")
-        print(f"Length of Predicted RH In (GRU-Combined-models): {len(self.rh_in_predicted_combined_models)}")
-        print(f"Length of Predicted PAR In (GRU-Combined-models): {len(self.par_in_predicted_combined_models)}")
+        print(f"Length of Predicted CO2 In (LSTM-Combined-models): {len(self.co2_in_predicted_combined_models)}")
+        print(f"Length of Predicted Temperature In (LSTM-Combined-models): {len(self.temp_in_predicted_combined_models)}")
+        print(f"Length of Predicted RH In (LSTM-Combined-models): {len(self.rh_in_predicted_combined_models)}")
+        print(f"Length of Predicted PAR In (LSTM-Combined-models): {len(self.par_in_predicted_combined_models)}")
         
         if self.action_from_drl == True and self.online_measurements == False:
             
@@ -1098,9 +1098,9 @@ class MiniGreenhouse(gym.Env):
 
         return metrics_nn, metrics_gl, metrics_combined
     
-    def predict_inside_measurements_gru(self, target_variable, data_input):
+    def predict_inside_measurements_LSTM(self, target_variable, data_input):
         '''
-        Predict the measurements or state variables inside mini-greenhouse using a GRU model to combine both of 
+        Predict the measurements or state variables inside mini-greenhouse using a LSTM model to combine both of 
         the GL and NN models.
         
         Parameters:
@@ -1108,7 +1108,7 @@ class MiniGreenhouse(gym.Env):
         data_input: dict or pd.DataFrame - The input features for the prediction.
 
         Features (inputs):
-            - timesteps
+            - Timesteps [5 minutes]
             - {target_variable} (Predicted GL)
             - {target_variable} (Predicted NN)
         
@@ -1132,8 +1132,8 @@ class MiniGreenhouse(gym.Env):
         if isinstance(data_input, dict):
             data_input = pd.DataFrame(data_input)
         
-         # Features required for the GRU model
-        features = ['timesteps', f'{target_variable} (Predicted GL)', f'{target_variable} (Predicted NN)']
+         # Features required for the LSTM model
+        features = ['Timesteps [5 minutes]', f'{target_variable} (Predicted GL)', f'{target_variable} (Predicted NN)']
 
         # Ensure the data_input has the required features
         for feature in features:
@@ -1146,8 +1146,8 @@ class MiniGreenhouse(gym.Env):
         X_features_values = X_features.values
         X_features_reshaped = X_features_values.reshape((X_features_values.shape[0], -1, X_features_values.shape[1]))
         
-        # Load the GRU model
-        with open(f"trained-gru-models/{target_variable.replace(' ', '_')}_gru_model.json", "r") as json_file:
+        # Load the LSTM model
+        with open(f"trained-lstm-models/{target_variable.replace(' ', '_')}_lstm_model.json", "r") as json_file:
             loaded_model_json = json_file.read()
             loaded_model = tf.keras.models.model_from_json(
                 loaded_model_json,
@@ -1159,7 +1159,7 @@ class MiniGreenhouse(gym.Env):
             )
         
         # Load the model weights
-        loaded_model.load_weights(f"trained-gru-models/{target_variable.replace(' ', '_')}_gru_model.weights.h5")
+        loaded_model.load_weights(f"trained-lstm-models/{target_variable.replace(' ', '_')}_lstm_model.weights.h5")
         
         # Compile the loaded model
         loaded_model.compile(optimizer='adam', loss='mse', metrics=['mae', self.r2_score_metric])
@@ -1175,7 +1175,7 @@ class MiniGreenhouse(gym.Env):
     def predicted_combined_models(self, _timesteps):
         """
         Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL), 
-        and include predictions from the GRU model for all variables.
+        and include predictions from the LSTM model for all variables.
             
         This method updates the following attributes:
         - self.co2_in_combined_models
@@ -1184,9 +1184,9 @@ class MiniGreenhouse(gym.Env):
         - self.par_in_combined_models
         """
 
-        # Create data_input for GRU prediction
+        # Create data_input for LSTM prediction
         data_input = pd.DataFrame({
-            'timesteps': _timesteps,
+            'Timesteps [5 minutes]': _timesteps,
             'CO2 In (Predicted GL)': self.co2_in_predicted_gl.flatten(),
             'CO2 In (Predicted NN)': self.co2_in_predicted_nn[:, 0],
             'Temperature In (Predicted GL)': self.temp_in_predicted_gl.flatten(),
@@ -1197,12 +1197,12 @@ class MiniGreenhouse(gym.Env):
             'PAR In (Predicted NN)': self.par_in_predicted_nn[:, 0]
         })
         
-        # Predict inside measurements using the GRU model
-        new_time_combined = data_input['timesteps'][-4:]
-        new_par_in_predicted_combined = self.predict_inside_measurements_gru("PAR In", data_input)[-4:]
-        new_temp_in_predicted_combined = self.predict_inside_measurements_gru("Temperature In", data_input)[-4:]
-        new_rh_in_predicted_combined = self.predict_inside_measurements_gru("RH In", data_input)[-4:]
-        new_co2_in_predicted_combined = self.predict_inside_measurements_gru("CO2 In", data_input)[-4:]
+        # Predict inside measurements using the LSTM model
+        new_time_combined = data_input['Timesteps [5 minutes]'][-4:]
+        new_par_in_predicted_combined = self.predict_inside_measurements_LSTM("PAR In", data_input)[-4:]
+        new_temp_in_predicted_combined = self.predict_inside_measurements_LSTM("Temperature In", data_input)[-4:]
+        new_rh_in_predicted_combined = self.predict_inside_measurements_LSTM("RH In", data_input)[-4:]
+        new_co2_in_predicted_combined = self.predict_inside_measurements_LSTM("CO2 In", data_input)[-4:]
         
         # Check if instance variables already exist; if not, initialize them
         if not hasattr(self, 'time_combined_models'):

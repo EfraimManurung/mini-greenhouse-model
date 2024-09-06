@@ -165,7 +165,7 @@ class DataPlotter:
 
 def main():
     # Read the Excel file into a DataFrame
-    filepath = 'output_simulated_data_offline.xlsx'  # Replace with the path to your Excel file
+    filepath = 'output_simulated_data_online.xlsx'  # Replace with the path to your Excel file
     df = pd.read_excel(filepath)
 
     # Initialize the DataPlotter with the DataFrame

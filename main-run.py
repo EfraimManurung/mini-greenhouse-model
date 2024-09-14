@@ -18,7 +18,6 @@ from ray.rllib.algorithms.algorithm import Algorithm
 
 # Import supporting libraries
 import time
-import matplotlib.pyplot as plt  # Import matplotlib for plotting
 
 # Assuming the NeuralNetworksModel class is defined as provided
 from MiniGreenhouse import MiniGreenhouse
@@ -35,7 +34,7 @@ env = MiniGreenhouse({  "flag_run": True,
                         "first_day_nn": 4320, # 15 days * 72 steps * 4 [-] data / steps
                         "season_length_gl": 1/72,
                         "season_length_nn": 0,
-                        "online_measurements": True,
+                        "online_measurements": False,
                         "action_from_drl": True,
                         "flag_run_nn": True,
                         "flag_run_gl": True,

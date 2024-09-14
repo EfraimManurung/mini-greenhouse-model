@@ -8,18 +8,22 @@ MSc Thesis in Information Technology Group, Wageningen University
 efraim.efraimpartoginahotasi@wur.nl
 efraim.manurung@gmail.com
 
-Table 1 Meaning of the state x(t), measurement y(t), control signal u(t) and disturbance d(t).
-----------------------------------------------------------------------------------------------------------------------------------
- x1(t) Dry-weight (m2 / m-2)					 y1(t) Dry-weight (m2 / m-2) 
- x2(t) Indoor CO2 (ppm)							 y2(t) Indoor CO2 (ppm)
- x3(t) Indoor temperature (◦C)					 y3(t) Indoor temperature (◦C)
- x4(t) Indoor humidity (%)						 y4(t) Indoor humidity (%)
- x5(t) PAR Inside (W / m2)					     x5(t) PAR Inside (W / m2)
-----------------------------------------------------------------------------------------------------------------------------------
- d1(t) Outside Radiation (W / m2)				 u1(t) Fan (-)
- d2(t) Outdoor CO2 (ppm)						 u2(t) Toplighting status (-)
- d3(t) Outdoor temperature (◦C)					 u3(t) Heating (-) 
- 
+Table 1 Meaning of the state x(t), x'(t), real measurement y(t), prediction measurement ŷ(t), 
+control signal u(t), and disturbance d(t).
+---------------------------------------------------------------------------------------------------------
+x1(t), x'1(t)  Indoor CO2 [ppm]                       y1(t)  Indoor CO2 [ppm]
+x2(t), x'2(t)  Indoor temperature [°C]                y2(t)  Indoor temperature [°C]
+x3(t), x'3(t)  Indoor humidity [%]                    y3(t)  Indoor humidity [%]
+x4(t), x'4(t)  PAR Inside [W/m²]                      y4(t)  PAR Inside [W/m²]
+x5(t), x'5(t)  Fruit Dry-weight [m²/m²]               ŷ(t)  Prediction from calibration model
+x6(t), x'6(t)  Crop Development Stage [°C day]
+---------------------------------------------------------------------------------------------------------
+d1(t)  Outside Radiation [W/m²]                       u1(t)  Fan [-]
+d2(t)  Outdoor CO2 [ppm]                              u2(t)  Toplighting status [-]
+d3(t)  Outdoor temperature [°C]                       u3(t)  Heating [-]
+d4(t)  Outdoor humidity [%]
+---------------------------------------------------------------------------------------------------------
+
 based on Table 1, we want to predict the state variable x(t) with control signal u(t) and disturbance d(t)
  
 Project sources:

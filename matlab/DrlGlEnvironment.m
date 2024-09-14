@@ -164,6 +164,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     % description and validation of a tomato yield model
     % The 24 h mean canopy temperature was approximated by a first order differential equation:
     % see the paper
+    % Read also the 3.3. State variables of the model
 
     % Set initial values for crop
     % start with 3.12 plants/m2, assume they are each 2 g = 6240 mg/m2.

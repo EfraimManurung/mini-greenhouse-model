@@ -4,7 +4,6 @@ Deep Reinforcement Learning for mini-greenhouse
 Author: Efraim Manurung
 MSc Thesis in Information Technology Group, Wageningen University
 
-efraim.efraimpartoginahotasi@wur.nl
 efraim.manurung@gmail.com
 '''
 

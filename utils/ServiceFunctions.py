@@ -140,10 +140,10 @@ class ServiceFunctions:
         return vaporPres
     
     def plot_all_data(self, filename, time, co2_actual, temp_actual, rh_actual, par_actual, 
-                    co2_predicted_nn, temp_predicted_nn, rh_predicted_nn, par_predicted_nn, 
+                    co2_predicted_dnn, temp_predicted_dnn, rh_predicted_dnn, par_predicted_dnn, 
                     co2_predicted_gl, temp_predicted_gl, rh_predicted_gl, par_predicted_gl, 
                     co2_combined=None, temp_combined=None, rh_combined=None, par_combined=None, 
-                    metrics_nn=None, metrics_gl=None, metrics_combined=None):
+                    metrics_dnn=None, metrics_gl=None, metrics_combined=None):
         '''
         Plot all the parameters to make it easier to compare predicted vs actual values, including Leaf Temperature.
 
@@ -156,11 +156,11 @@ class ServiceFunctions:
         - par_actual: List of actual PAR values
         - leaf_temp_actual: List of actual leaf temperature values
         
-        - co2_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_predicted_nn: List of predicted PAR values from Neural Network
-        - leaf_temp_predicted_nn: List of predicted leaf temperature values from Neural Network
+        - co2_predicted_dnn: List of predicted CO2 values from Neural Network
+        - temp_predicted_dnn: List of predicted temperature values from Neural Network
+        - rh_predicted_dnn: List of predicted relative humidity values from Neural Network
+        - par_predicted_dnn: List of predicted PAR values from Neural Network
+        - leaf_temp_predicted_dnn: List of predicted leaf temperature values from Neural Network
         
         - co2_predicted_gl: List of predicted CO2 values from GreenLight Model
         - temp_predicted_gl: List of predicted temperature values from GreenLight Model
@@ -174,7 +174,7 @@ class ServiceFunctions:
         - par_combined: List of combined PAR predictions (optional)
         - leaf_temp_combined: List of combined leaf temperature predictions (optional)
         
-        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions (optional)
+        - metrics_dnn: Dictionary with RMSE, RRMSE, and ME for DNN predictions (optional)
         - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions (optional)
         - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions (optional)
         '''
@@ -184,20 +184,20 @@ class ServiceFunctions:
 
         # Data to be plotted along with their titles and predicted data
         data = [
-            (co2_actual, co2_predicted_nn, co2_predicted_gl, co2_combined, 'CO2 In [ppm]',
-            metrics_nn['CO2'] if metrics_nn else None,
+            (co2_actual, co2_predicted_dnn, co2_predicted_gl, co2_combined, 'CO2 In [ppm]',
+            metrics_dnn['CO2'] if metrics_dnn else None,
             metrics_gl['CO2'] if metrics_gl else None,
             metrics_combined['CO2'] if metrics_combined else None),
-            (temp_actual, temp_predicted_nn, temp_predicted_gl, temp_combined, 'Temperature In [°C]',
-            metrics_nn['Temperature'] if metrics_nn else None,
+            (temp_actual, temp_predicted_dnn, temp_predicted_gl, temp_combined, 'Temperature In [°C]',
+            metrics_dnn['Temperature'] if metrics_dnn else None,
             metrics_gl['Temperature'] if metrics_gl else None,
             metrics_combined['Temperature'] if metrics_combined else None),
-            (rh_actual, rh_predicted_nn, rh_predicted_gl, rh_combined, 'RH In [%]',
-            metrics_nn['Humidity'] if metrics_nn else None,
+            (rh_actual, rh_predicted_dnn, rh_predicted_gl, rh_combined, 'RH In [%]',
+            metrics_dnn['Humidity'] if metrics_dnn else None,
             metrics_gl['Humidity'] if metrics_gl else None,
             metrics_combined['Humidity'] if metrics_combined else None),
-            (par_actual, par_predicted_nn, par_predicted_gl, par_combined, 'PAR In [W/m²]',
-            metrics_nn['PAR'] if metrics_nn else None,
+            (par_actual, par_predicted_dnn, par_predicted_gl, par_combined, 'PAR In [W/m²]',
+            metrics_dnn['PAR'] if metrics_dnn else None,
             metrics_gl['PAR'] if metrics_gl else None,
             metrics_combined['PAR'] if metrics_combined else None)
         ]
@@ -206,13 +206,13 @@ class ServiceFunctions:
         axes_flat = axes.flatten()
 
         # Plot each dataset in a subplot
-        for ax, (y_actual, y_pred_nn, y_pred_gl, y_combined, title, nn_metrics, gl_metrics, combined_metrics) in zip(axes_flat, data):
+        for ax, (y_actual, y_pred_dnn, y_pred_gl, y_combined, title, dnn_metrics, gl_metrics, combined_metrics) in zip(axes_flat, data):
             # Plot actual data if it is not None
             if y_actual is not None:
                 ax.plot(time, y_actual, label='Actual', color='blue')
             
             # Plot predicted data
-            ax.plot(time, y_pred_nn, label='Predicted NN', color='purple', linestyle='--')
+            ax.plot(time, y_pred_dnn, label='Predicted dnn', color='purple', linestyle='--')
             ax.plot(time, y_pred_gl, label='Predicted GL', color='green', linestyle=':')
             
             # Only plot combined data if it's not None
@@ -220,9 +220,9 @@ class ServiceFunctions:
                 ax.plot(time, y_combined, label='Predicted Combined', color='red', linestyle='-.')
 
             # Add RMSE, RRMSE, and ME to the title if metrics are available
-            if nn_metrics and gl_metrics and combined_metrics:
+            if dnn_metrics and gl_metrics and combined_metrics:
                 ax.set_title(f"{title}\n"
-                            f"NN RMSE: {nn_metrics[0]:.4f}, RRMSE: {nn_metrics[1]:.4f}, ME: {nn_metrics[2]:.4f}\n"
+                            f"DNN RMSE: {dnn_metrics[0]:.4f}, RRMSE: {dnn_metrics[1]:.4f}, ME: {dnn_metrics[2]:.4f}\n"
                             f"GreenLight RMSE: {gl_metrics[0]:.4f}, RRMSE: {gl_metrics[1]:.4f}, ME: {gl_metrics[2]:.4f}\n"
                             f"Combined RMSE: {combined_metrics[0]:.4f}, RRMSE: {combined_metrics[1]:.4f}, ME: {combined_metrics[2]:.4f}")
             else:
@@ -240,18 +240,18 @@ class ServiceFunctions:
         # Save the plot to a file
         fig.savefig(filename, dpi=1000)
     
-    def plot_leaf_temperature(self, filename, time, leaf_temp_actual, leaf_temp_predicted_nn, leaf_temp_predicted_gl, leaf_temp_combined=None,
-                            metrics_nn=None, metrics_gl=None, metrics_combined=None):
+    def plot_leaf_temperature(self, filename, time, leaf_temp_actual, leaf_temp_predicted_dnn, leaf_temp_predicted_gl, leaf_temp_combined=None,
+                            metrics_dnn=None, metrics_gl=None, metrics_combined=None):
         '''
         Plot leaf_temperature parameter to make it easier to compare predicted vs actual values.
 
         Parameters:
         - time: List of time values
         - leaf_temp_actual: List of actual leaf temperature values
-        - leaf_temp_predicted_nn: List of predicted leaf temperature values from Neural Network
+        - leaf_temp_predicted_dnn: List of predicted leaf temperature values from Neural Network
         - leaf_temp_predicted_gl: List of predicted leaf temperature values from GreenLight Model
         - leaf_temp_combined: List of combined leaf temperature predictions (optional)
-        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions (optional)
+        - metrics_dnn: Dictionary with RMSE, RRMSE, and ME for DNN predictions (optional)
         - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions (optional)
         - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions (optional)
         '''
@@ -263,8 +263,8 @@ class ServiceFunctions:
         if leaf_temp_actual is not None:
             plt.plot(time, leaf_temp_actual, label='Actual', color='blue')
 
-        # Plot predicted leaf temperature from NN
-        plt.plot(time, leaf_temp_predicted_nn, label='Predicted NN', color='purple', linestyle='--')
+        # Plot predicted leaf temperature from DNN
+        plt.plot(time, leaf_temp_predicted_dnn, label='Predicted DNN', color='purple', linestyle='--')
 
         # Plot predicted leaf temperature from GreenLight model
         plt.plot(time, leaf_temp_predicted_gl, label='Predicted GL', color='green', linestyle=':')
@@ -275,11 +275,11 @@ class ServiceFunctions:
 
         # Prepare the title, including metrics if available
         title = 'Leaf Temperature In [°C]'
-        if metrics_nn and metrics_gl and metrics_combined:
-            title += (f"\nNN RMSE: {metrics_nn[0]:.4f}, RRMSE: {metrics_nn[1]:.4f}%, ME: {metrics_nn[2]:.4f}°C\n"
+        if metrics_dnn and metrics_gl and metrics_combined:
+            title += (f"\nDNN RMSE: {metrics_dnn[0]:.4f}, RRMSE: {metrics_dnn[1]:.4f}%, ME: {metrics_dnn[2]:.4f}°C\n"
                     f"GL RMSE: {metrics_gl[0]:.4f}, RRMSE: {metrics_gl[1]:.4f}%, ME: {metrics_gl[2]:.4f}°C\n"
                     f"Combined RMSE: {metrics_combined[0]:.4f}, RRMSE: {metrics_combined[1]:.4f}%, ME: {metrics_combined[2]:.4f}°C")
-        
+                
         # Set title with or without metrics
         plt.title(title)
 
@@ -302,7 +302,7 @@ class ServiceFunctions:
 
     def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
                         co2_actual=None, temp_actual=None, rh_actual=None, par_actual=None, leaf_temp_actual=None,
-                        co2_predicted_nn=None, temp_predicted_nn=None, rh_predicted_nn=None, par_predicted_nn=None, leaf_temp_predicted_nn=None,
+                        co2_predicted_dnn=None, temp_predicted_dnn=None, rh_predicted_dnn=None, par_predicted_dnn=None, leaf_temp_predicted_dnn=None,
                         co2_predicted_gl=None, temp_predicted_gl=None, rh_predicted_gl=None, par_predicted_gl=None, leaf_temp_predicted_gl=None,
                         co2_predicted_combined=None, temp_predicted_combined=None, rh_predicted_combined=None, par_predicted_combined=None, leaf_temp_predicted_combined=None):
         '''
@@ -322,11 +322,11 @@ class ServiceFunctions:
         - par_actual: List of actual PAR values (optional)
         - leaf_temp_actual: List of actual leaf temperature (optional)
         
-        - co2_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_predicted_nn: List of predicted PAR values from Neural Network
-        - leaf_temp_predicted_nn: List of predicted leaf temperature values from Neural Network
+        - co2_predicted_dnn: List of predicted CO2 values from Neural Network
+        - temp_predicted_dnn: List of predicted temperature values from Neural Network
+        - rh_predicted_dnn: List of predicted relative humidity values from Neural Network
+        - par_predicted_dnn: List of predicted PAR values from Neural Network
+        - leaf_temp_predicted_dnn: List of predicted leaf temperature values from Neural Network
         
         - co2_predicted_gl: List of predicted CO2 values from the GreenLight Model
         - temp_predicted_gl: List of predicted temperature values from the GreenLight Model
@@ -350,8 +350,8 @@ class ServiceFunctions:
             'Rewards': reward_list
         }
         
-        if co2_predicted_nn is not None:
-            data['CO2 In (Predicted NN)'] = co2_predicted_nn
+        if co2_predicted_dnn is not None:
+            data['CO2 In (Predicted DNN)'] = co2_predicted_dnn
         if co2_predicted_gl is not None:
             data['CO2 In (Predicted GL)'] = co2_predicted_gl
         if co2_predicted_combined is not None:
@@ -359,8 +359,8 @@ class ServiceFunctions:
         if co2_actual is not None:
             data['CO2 In (Actual)'] = co2_actual
             
-        if temp_predicted_nn is not None:
-            data['Temperature In (Predicted NN)'] = temp_predicted_nn
+        if temp_predicted_dnn is not None:
+            data['Temperature In (Predicted DNN)'] = temp_predicted_dnn
         if temp_predicted_gl is not None:
             data['Temperature In (Predicted GL)'] = temp_predicted_gl
         if temp_predicted_combined is not None:
@@ -368,8 +368,8 @@ class ServiceFunctions:
         if temp_actual is not None:
             data['Temperature In (Actual)'] = temp_actual
             
-        if rh_predicted_nn is not None:
-            data['RH In (Predicted NN)'] = rh_predicted_nn
+        if rh_predicted_dnn is not None:
+            data['RH In (Predicted DNN)'] = rh_predicted_dnn
         if rh_predicted_gl is not None:
             data['RH In (Predicted GL)'] = rh_predicted_gl
         if rh_predicted_combined is not None:
@@ -377,8 +377,8 @@ class ServiceFunctions:
         if rh_actual is not None:
             data['RH In (Actual)'] = rh_actual
             
-        if par_predicted_nn is not None:
-            data['PAR In (Predicted NN)'] = par_predicted_nn
+        if par_predicted_dnn is not None:
+            data['PAR In (Predicted DNN)'] = par_predicted_dnn
         if par_predicted_gl is not None:
             data['PAR In (Predicted GL)'] = par_predicted_gl
         if par_predicted_combined is not None:
@@ -386,8 +386,8 @@ class ServiceFunctions:
         if par_actual is not None:
             data['PAR In (Actual)'] = par_actual
             
-        if leaf_temp_predicted_nn is not None:
-            data['Leaf Temp (Predicted NN)'] = leaf_temp_predicted_nn
+        if leaf_temp_predicted_dnn is not None:
+            data['Leaf Temp (Predicted DNN)'] = leaf_temp_predicted_dnn
         if leaf_temp_predicted_gl is not None:
             data['Leaf Temp (Predicted GL)'] = leaf_temp_predicted_gl
         if leaf_temp_predicted_combined is not None:
@@ -516,13 +516,13 @@ class ServiceFunctions:
     
     import pandas as pd
 
-    def export_evaluated_data_to_excel_table(self, filename, metrics_nn, metrics_gl, metrics_combined):
+    def export_evaluated_data_to_excel_table(self, filename, metrics_dnn, metrics_gl, metrics_combined):
         '''
-        Export the evaluation metrics (RMSE, RRMSE, and ME) for NN, GL, and Combined models to an Excel file.
+        Export the evaluation metrics (RMSE, RRMSE, and ME) for DNN, GL, and Combined models to an Excel file.
 
         Parameters:
         - filename: Name of the output Excel file
-        - metrics_nn: Dictionary with RMSE, RRMSE, and ME for NN predictions
+        - metrics_dnn: Dictionary with RMSE, RRMSE, and ME for DNN predictions
         - metrics_gl: Dictionary with RMSE, RRMSE, and ME for GL predictions
         - metrics_combined: Dictionary with RMSE, RRMSE, and ME for Combined predictions
         '''
@@ -532,8 +532,8 @@ class ServiceFunctions:
         variables = ['PAR', 'Temperature', 'Humidity', 'CO2', 'Leaf Temperature']
 
         for variable in variables:
-            # NN metrics
-            rmse_nn, rrmse_nn, me_nn = metrics_nn[variable]
+            # DNN metrics
+            rmse_dnn, rrmse_dnn, me_dnn = metrics_dnn[variable]
             # GL metrics
             rmse_gl, rrmse_gl, me_gl = metrics_gl[variable]
             # Combined metrics
@@ -556,7 +556,7 @@ class ServiceFunctions:
             unit_rrmse = "%"  # RRMSE is always in percentage
 
             # Append rows for each variable and model type with values and units in separate columns
-            rows.append([f"{variable} (NN)", rmse_nn, unit_rmse, rrmse_nn, unit_rrmse, me_nn, unit_me])
+            rows.append([f"{variable} (DNN)", rmse_dnn, unit_rmse, rrmse_dnn, unit_rrmse, me_dnn, unit_me])
             rows.append([f"{variable} (GL)", rmse_gl, unit_rmse, rrmse_gl, unit_rrmse, me_gl, unit_me])
             rows.append([f"{variable} (Combined)", rmse_combined, unit_rmse, rrmse_combined, unit_rrmse, me_combined, unit_me])
 

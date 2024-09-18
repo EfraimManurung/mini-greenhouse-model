@@ -1,6 +1,6 @@
 '''
 Calibrator model with Artifical Neural Networks algorithm and glysics based model (the GreenLight model). 
-In this class we will combine the ANN model with the GreenLight model.
+In this class we will combine the DNN model with the GreenLight model.
 
 Author: Efraim Manurung
 MSc Thesis in Information Technology Group, Wageningen University
@@ -14,8 +14,9 @@ x1(t), x'1(t)  Indoor CO2 [ppm]                       y1(t)  Indoor CO2 [ppm]
 x2(t), x'2(t)  Indoor temperature [°C]                y2(t)  Indoor temperature [°C]
 x3(t), x'3(t)  Indoor humidity [%]                    y3(t)  Indoor humidity [%]
 x4(t), x'4(t)  PAR Inside [W/m²]                      y4(t)  PAR Inside [W/m²]
-x5(t), x'5(t)  Fruit Dry-weight [m²/m²]               ŷ(t)  Prediction from calibration model
-x6(t), x'6(t)  Crop Development Stage [°C day]
+x5(t), x'5(t)  Fruit Dry-weight [m²/m²]               y5(t)  Leaf Temperature [°C]
+x6(t), x'6(t)  Crop Development Stage [°C day]        ŷ(t)  Prediction from calibration model
+x7(t), x'7(t)  Leaf Temperature [°C]
 ---------------------------------------------------------------------------------------------------------
 d1(t)  Outside Radiation [W/m²]                       u1(t)  Fan [-]
 d2(t)  Outdoor CO2 [ppm]                              u2(t)  Toplighting status [-]
@@ -27,7 +28,7 @@ based on Table 1, we want to predict the state variable x(t) with control signal
  
 Project sources:
     - Tensor flow
-    - 
+    - Github repositories
 Other sources:
     -
     -
@@ -52,7 +53,7 @@ import matlab.engine
 # Import service functions
 from utils.ServiceFunctions import ServiceFunctions
 
-# IMPORT LIBRARIES for NN and LSTM models
+# IMPORT LIBRARIES for DNN and LSTM models
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Layer
@@ -73,7 +74,7 @@ tf.compat.v1.enable_eager_execution()
 
 class MiniGreenhouse(gym.Env):
     '''
-    Calibrator model that combine a NN model and physics based model.
+    Calibrator model that combine a DNN model and physics based model.
     
     Link the Python code to matlab program with related methods. We can link it with the .mat file.
     '''
@@ -91,16 +92,16 @@ class MiniGreenhouse(gym.Env):
         # Initialize if the main program for training or running
         self.flag_run  = env_config.get("flag_run", True) # The simulation is for running (other option is False for training)
         self.first_day_gl = env_config.get("first_day_gl", 1) # The first day of the simulation
-        self.first_day_nn = env_config.get("first_day_nn", 0) # 1 / 72 in matlab is 1 step in this NN model, 20 minutes
+        self.first_day_dnn = env_config.get("first_day_dnn", 0) # 1 / 72 in matlab is 1 step in this DNN model, 20 minutes
         
         # Define the season length parameter
         # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
         self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
-        self.season_length_nn = self.first_day_nn #env_config.get("season_length_nn", 0) # so we can substract the timesteps, that is why we used the season_length_nn from the first_day
+        self.season_length_dnn = self.first_day_dnn #env_config.get("season_length_dnn", 0) # so we can substract the timesteps, that is why we used the season_length_dnn from the first_day
         
         self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
-        self.flag_run_nn = env_config.get("flag_run_nn", False) # Default is false, flag to run the Neural Networks model
+        self.flag_run_dnn = env_config.get("flag_run_dnn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         self.flag_run_combined_models = env_config.get("flag_run_combined_models", True) # Default is true, flag to run the LSTM model
         
@@ -114,8 +115,8 @@ class MiniGreenhouse(gym.Env):
         if self.flag_run_gl == True:
             self.matlab_script_path = r'matlab\DrlGlEnvironment.m'
         
-        # No matter if the flag_run_nn True or not we still need to load the files for the offline training
-        # Load the datasets from separate files for the NN model
+        # No matter if the flag_run_dnn True or not we still need to load the files for the offline training
+        # Load the datasets from separate files for the DNN model
         # file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
         file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-converted.xlsx"
         
@@ -168,14 +169,14 @@ class MiniGreenhouse(gym.Env):
             #Predict from the GL model
             self.predicted_inside_measurements_gl()
             
-        if self.flag_run_nn == True:
+        if self.flag_run_dnn == True:
             
-            # Predict from the NN model
-            self.predicted_inside_measurements_nn()
-            self.season_length_nn += 4
+            # Predict from the DNN model
+            self.predicted_inside_measurements_dnn()
+            self.season_length_dnn += 4
         
-        # Combine the predicted results from the GL and NN models
-        time_steps_formatted= list(range(0, int(self.season_length_nn - self.first_day_nn)))
+        # Combine the predicted results from the GL and DNN models
+        time_steps_formatted= list(range(0, int(self.season_length_dnn - self.first_day_dnn)))
         self.format_time_steps(time_steps_formatted)
             
         if self.flag_run_combined_models == True:
@@ -396,7 +397,7 @@ class MiniGreenhouse(gym.Env):
             print("load_excel_or_mqtt_data from OFFLINE MEASUREMENTS")
         
             # Slice the dataframe to get the rows for the current step
-            self.step_data = self.mgh_data.iloc[self.season_length_nn:self.season_length_nn + 4]
+            self.step_data = self.mgh_data.iloc[self.season_length_dnn:self.season_length_dnn + 4]
 
             # Extract the required columns and flatten them
             new_time_excel_mqtt = self.step_data['time'].values
@@ -472,7 +473,7 @@ class MiniGreenhouse(gym.Env):
             print("Step Data (offline):", self.step_data.head())
     
     # @tf.function
-    def predict_inside_measurements_nn(self, target_variable, data_input):
+    def predict_inside_measurements_dnn(self, target_variable, data_input):
         '''
         Predict the measurements or state variables inside mini-greenhouse 
         
@@ -510,12 +511,12 @@ class MiniGreenhouse(gym.Env):
         
         # Load the model and scaler with error handling
         try:
-            loaded_model = load_model(f'trained-nn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
+            loaded_model = load_model(f'trained-dnn-models/{target_variable}_model.keras', custom_objects={'r2_score_metric': self.r2_score_metric})
         except Exception as e:
             raise ValueError(f"Failed to load the model: {e}")
         
         try:
-            scaler = joblib.load(f'trained-nn-models/{target_variable}_scaler.pkl')
+            scaler = joblib.load(f'trained-dnn-models/{target_variable}_scaler.pkl')
         except Exception as e:
             raise ValueError(f"Failed to load the scaler: {e}")
                     
@@ -528,34 +529,34 @@ class MiniGreenhouse(gym.Env):
         # Return the predicted measurements inside the mini-greenhouse
         return y_hat_measurements
     
-    def predicted_inside_measurements_nn(self):
+    def predicted_inside_measurements_dnn(self):
         '''
         Predicted inside measurements
         
         '''
     
         # Predict the inside measurements (the state variable inside the mini-greenhouse)
-        new_par_in_predicted_nn = self.predict_inside_measurements_nn('global in', self.step_data)
-        new_temp_in_predicted_nn = self.predict_inside_measurements_nn('temp in', self.step_data)
-        new_rh_in_predicted_nn = self.predict_inside_measurements_nn('rh in', self.step_data)
-        new_co2_in_predicted_nn = self.predict_inside_measurements_nn('co2 in', self.step_data)
-        new_leaf_temp_predicted_nn = self.predict_inside_measurements_nn('leaf temp', self.step_data)
+        new_par_in_predicted_dnn = self.predict_inside_measurements_dnn('global in', self.step_data)
+        new_temp_in_predicted_dnn = self.predict_inside_measurements_dnn('temp in', self.step_data)
+        new_rh_in_predicted_dnn = self.predict_inside_measurements_dnn('rh in', self.step_data)
+        new_co2_in_predicted_dnn = self.predict_inside_measurements_dnn('co2 in', self.step_data)
+        new_leaf_temp_predicted_dnn = self.predict_inside_measurements_dnn('leaf temp', self.step_data)
     
         # Check if instance variables already exist; if not, initialize them
-        if not hasattr(self, 'temp_in_predicted_nn'):
-            self.par_in_predicted_nn = new_par_in_predicted_nn
-            self.temp_in_predicted_nn = new_temp_in_predicted_nn
-            self.rh_in_predicted_nn = new_rh_in_predicted_nn
-            self.co2_in_predicted_nn = new_co2_in_predicted_nn
-            self.leaf_temp_predicted_nn = new_leaf_temp_predicted_nn
+        if not hasattr(self, 'temp_in_predicted_dnn'):
+            self.par_in_predicted_dnn = new_par_in_predicted_dnn
+            self.temp_in_predicted_dnn = new_temp_in_predicted_dnn
+            self.rh_in_predicted_dnn = new_rh_in_predicted_dnn
+            self.co2_in_predicted_dnn = new_co2_in_predicted_dnn
+            self.leaf_temp_predicted_dnn = new_leaf_temp_predicted_dnn
     
         else:
             # Concatenate new data with existing data
-            self.par_in_predicted_nn = np.concatenate((self.par_in_predicted_nn, new_par_in_predicted_nn))
-            self.temp_in_predicted_nn = np.concatenate((self.temp_in_predicted_nn, new_temp_in_predicted_nn))
-            self.rh_in_predicted_nn = np.concatenate((self.rh_in_predicted_nn, new_rh_in_predicted_nn))
-            self.co2_in_predicted_nn = np.concatenate((self.co2_in_predicted_nn, new_co2_in_predicted_nn))
-            self.leaf_temp_predicted_nn = np.concatenate((self.leaf_temp_predicted_nn, new_leaf_temp_predicted_nn))
+            self.par_in_predicted_dnn = np.concatenate((self.par_in_predicted_dnn, new_par_in_predicted_dnn))
+            self.temp_in_predicted_dnn = np.concatenate((self.temp_in_predicted_dnn, new_temp_in_predicted_dnn))
+            self.rh_in_predicted_dnn = np.concatenate((self.rh_in_predicted_dnn, new_rh_in_predicted_dnn))
+            self.co2_in_predicted_dnn = np.concatenate((self.co2_in_predicted_dnn, new_co2_in_predicted_dnn))
+            self.leaf_temp_predicted_dnn = np.concatenate((self.leaf_temp_predicted_dnn, new_leaf_temp_predicted_dnn))
                 
     def predicted_inside_measurements_gl(self):
         '''
@@ -614,7 +615,7 @@ class MiniGreenhouse(gym.Env):
         int: The initial observation of the environment.
         '''
         self.current_step = 0
-        # self.season_length_nn += 4 # moved it to the intialized class 
+        # self.season_length_dnn += 4 # moved it to the intialized class 
         
         return self.observation(), {}
 
@@ -635,7 +636,7 @@ class MiniGreenhouse(gym.Env):
             print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
             print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
             
-            # in otder: co2_in, temp_in, rh_in, PAR_in, fruit_dw, and leaf_temp
+            #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and leaf_temp
             return np.array([
                 self.co2_in_predicted_combined_models[-1],      # use combined models for the observation
                 self.temp_in_predicted_combined_models[-1],     # use combined models for the observation
@@ -643,12 +644,12 @@ class MiniGreenhouse(gym.Env):
                 self.par_in_predicted_combined_models[-1],      # use combined models for the observation
                 self.fruit_dw_predicted_gl[-1],                 # use the predicted from the GL
                 self.fruit_tcansum_predicted_gl[-1],            # use the predicted from the GL
-                self.leaf_temp_predicted_gl[-1]                 # use combined models for the observation
+                self.leaf_temp_predicted_combined_models[-1]    # use combined models for the observation
             ], np.float32) 
                 
         else:
             
-            # in otder: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and fruit_tcan
+            #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and leaf_temp
             return np.array([
                 self.co2_in_predicted_gl[-1],
                 self.temp_in_predicted_gl[-1],
@@ -839,8 +840,8 @@ class MiniGreenhouse(gym.Env):
         self.season_length_gl = 1 / 72 
         self.first_day_gl += 1 / 72 
         
-        # Update the season_length for the NN model
-        self.season_length_nn += 4
+        # Update the season_length for the DNN model
+        self.season_length_dnn += 4
 
         if self.flag_run_gl == True:
             
@@ -893,17 +894,17 @@ class MiniGreenhouse(gym.Env):
             # Load the updated data from predcited from the greenlight model
             self.predicted_inside_measurements_gl()
         
-        if self.flag_run_nn == True:
-            # Call the predicted inside measurements with the NN model
-            self.predicted_inside_measurements_nn()
+        if self.flag_run_dnn == True:
+            # Call the predicted inside measurements with the DNN model
+            self.predicted_inside_measurements_dnn()
         
-        time_steps_formatted = list(range(0, int(self.season_length_nn - self.first_day_nn)))
+        time_steps_formatted = list(range(0, int(self.season_length_dnn - self.first_day_dnn)))
         # print("time_steps_formatted 2 : ", time_steps_formatted)
         
         self.format_time_steps(time_steps_formatted)
         
         if self.flag_run_combined_models == True:
-            # Combine the predicted results from the GL and NN models
+            # Combine the predicted results from the GL and DNN models
             self.predicted_combined_models(time_steps_formatted)
             
         # Calculate reward
@@ -935,10 +936,10 @@ class MiniGreenhouse(gym.Env):
         - rh_in_excel_mqtt: List of actual relative humidity values
         - par_in_excel_mqtt: List of actual PAR values
         
-        - co2_in_predicted_nn: List of predicted CO2 values from Neural Network
-        - temp_in_predicted_nn: List of predicted temperature values from Neural Network
-        - rh_in_predicted_nn: List of predicted relative humidity values from Neural Network
-        - par_in_predicted_nn: List of predicted PAR values from Neural Network
+        - co2_in_predicted_dnn: List of predicted CO2 values from Neural Network
+        - temp_in_predicted_dnn: List of predicted temperature values from Neural Network
+        - rh_in_predicted_dnn: List of predicted relative humidity values from Neural Network
+        - par_in_predicted_dnn: List of predicted PAR values from Neural Network
         
         - co2_in_predicted_gl: List of predicted CO2 values from Generalized Linear Model
         - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
@@ -957,10 +958,10 @@ class MiniGreenhouse(gym.Env):
         print(f"Length of Temperature In (Actual): {len(self.temp_in_excel_mqtt)}")
         print(f"Length of RH In (Actual): {len(self.rh_in_excel_mqtt)}")
         print(f"Length of PAR In (Actual): {len(self.global_in_excel_mqtt)}")
-        print(f"Length of Predicted CO2 In (NN): {len(self.co2_in_predicted_nn)}")
-        print(f"Length of Predicted Temperature In (NN): {len(self.temp_in_predicted_nn)}")
-        print(f"Length of Predicted RH In (NN): {len(self.rh_in_predicted_nn)}")
-        print(f"Length of Predicted PAR In (NN): {len(self.par_in_predicted_nn)}")
+        print(f"Length of Predicted CO2 In (DNN): {len(self.co2_in_predicted_dnn)}")
+        print(f"Length of Predicted Temperature In (DNN): {len(self.temp_in_predicted_dnn)}")
+        print(f"Length of Predicted RH In (DNN): {len(self.rh_in_predicted_dnn)}")
+        print(f"Length of Predicted PAR In (DNN): {len(self.par_in_predicted_dnn)}")
         print(f"Length of Predicted CO2 In (GL): {len(self.co2_in_predicted_gl)}")
         print(f"Length of Predicted Temperature In (GL): {len(self.temp_in_predicted_gl)}")
         print(f"Length of Predicted RH In (GL): {len(self.rh_in_predicted_gl)}")
@@ -974,14 +975,14 @@ class MiniGreenhouse(gym.Env):
             print(f"Length of Predicted PAR In (LSTM-Combined-models): {len(self.par_in_predicted_combined_models)}")
             
             if self.action_from_drl == True and self.online_measurements == False:
-                print("---------------------------------------------------------")
+                print("---------------------------------------------------------------")
                 print("COMBINED MODELS | ACTION: DRL ON | OFFLINE")
                 
                 # Save all the data (included the actions) in an Excel file                
                 self.service_functions.export_to_excel(
                     file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
                     None, None, None, None, None,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], self.leaf_temp_predicted_nn[:, 0],
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
                     self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, self.leaf_temp_predicted_combined_models
                 )
@@ -993,7 +994,7 @@ class MiniGreenhouse(gym.Env):
                 self.service_functions.plot_all_data(
                     'output/output_all_data.png', self.time_combined_models, 
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], 
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], 
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, 
                     self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, 
                     None, None, None)
@@ -1003,23 +1004,23 @@ class MiniGreenhouse(gym.Env):
                                                             self.heater_list)
                         
             else:
-                print("---------------------------------------------------------")
+                print("---------------------------------------------------------------")
                 print("COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINER OR ONLINE")
                 
                 # Evaluate predictions to get R² and MAE metrics
-                metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
+                metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
 
                 # Save all the data in an Excel file
                 self.service_functions.export_to_excel(
                     file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], self.leaf_temp_predicted_nn[:, 0],
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
                     self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, self.leaf_temp_predicted_combined_models
                 )
                 
                 # Save the metrics data in an Excel file as table format
-                self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
+                self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_dnn, metrics_gl, metrics_combined)
 
                 # Save the rewards list 
                 self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
@@ -1028,19 +1029,19 @@ class MiniGreenhouse(gym.Env):
                 self.service_functions.plot_leaf_temperature('output/output_leaf_data.png', 
                                                              self.time_combined_models, 
                                                              self.leaf_temp_excel_mqtt,
-                                                             self.leaf_temp_predicted_nn,
+                                                             self.leaf_temp_predicted_dnn,
                                                              self.leaf_temp_predicted_gl,
                                                              self.leaf_temp_predicted_combined_models) #,
-                                                             #metrics_nn, metrics_gl, metrics_combined)
+                                                             #metrics_dnn, metrics_gl, metrics_combined)
             
                 # Plot the data
                 self.service_functions.plot_all_data(
                     'output/output_all_data.png', self.time_combined_models, 
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], 
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], 
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, 
                     self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, 
-                    metrics_nn, metrics_gl, metrics_combined)
+                    metrics_dnn, metrics_gl, metrics_combined)
                 
                 # Plot the actions
                 self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
@@ -1054,14 +1055,14 @@ class MiniGreenhouse(gym.Env):
             
             # Run with dynamics control from the DRL action
             if self.action_from_drl == True and self.online_measurements == False:
-                print("---------------------------------------------------------")
+                print("---------------------------------------------------------------")
                 print("NOT COMBINED MODELS | ACTION: DRL | OFFLINE")
                 
                 # Save all the data (included the actions) in an Excel file
                 self.service_functions.export_to_excel(
                     file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], self.leaf_temp_predicted_nn[:, 0],
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
                     None, None, None, None, None
                 )
@@ -1073,7 +1074,7 @@ class MiniGreenhouse(gym.Env):
                 self.service_functions.plot_all_data(
                     'output/output_all_data.png', self.time_combined_models, 
                     None, None, None, None, None, 
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], self.leaf_temp_predicted_nn[:, 0],
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
                     None, None, None, None, None,
                     None, None, None)
@@ -1084,23 +1085,23 @@ class MiniGreenhouse(gym.Env):
             
             # Run with scheduled actions
             else:
-                print("---------------------------------------------------------")
+                print("-------------------------------------------------------------------")
                 print("NOT COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINER OR ONLINE")
                 
                 # Evaluate predictions to get R² and MAE metrics
-                # metrics_nn, metrics_gl, metrics_combined = self.evaluate_predictions()
+                # metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
                 
                 # Save all the data in an Excel file                
                 self.service_functions.export_to_excel(
                     file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], self.leaf_temp_predicted_nn[:, 0],
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
                     None, None, None, None, None
                 )
                 
                 # Save the metrics data in an Excel file as table format
-                # self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_nn, metrics_gl, metrics_combined)
+                # self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_dnn, metrics_gl, metrics_combined)
 
                 # Save the rewards list 
                 self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
@@ -1109,14 +1110,14 @@ class MiniGreenhouse(gym.Env):
                 self.service_functions.plot_all_data(
                     'output/output_all_data.png', self.time_combined_models, 
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, 
-                    self.co2_in_predicted_nn[:, 0], self.temp_in_predicted_nn[:, 0], self.rh_in_predicted_nn[:, 0], self.par_in_predicted_nn[:, 0], 
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], 
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, 
                     None, None, None, None, 
                     None, None, None)
                 
                 self.service_functions.plot_leaf_temperature(
                     'output/output_leaf_data.png', self.time_combined_models,
-                    self.leaf_temp_excel_mqtt, self.leaf_temp_predicted_nn, self.leaf_temp_predicted_gl, None
+                    self.leaf_temp_excel_mqtt, self.leaf_temp_predicted_dnn, self.leaf_temp_predicted_gl, None
                 )
                 
                 # Plot the actions
@@ -1135,12 +1136,12 @@ class MiniGreenhouse(gym.Env):
         y_true_co2_in = self.co2_in_excel_mqtt
         y_true_leaf_temp = self.leaf_temp_excel_mqtt
 
-        # Extract predicted values from Neural Network (NN)
-        y_pred_par_in_nn = self.par_in_predicted_nn[:, 0]
-        y_pred_temp_in_nn = self.temp_in_predicted_nn[:, 0]
-        y_pred_rh_in_nn = self.rh_in_predicted_nn[:, 0]
-        y_pred_co2_in_nn = self.co2_in_predicted_nn[:, 0]
-        y_pred_leaf_temp_nn = self.leaf_temp_predicted_nn[:, 0]
+        # Extract predicted values from Neural Network (DNN)
+        y_pred_par_in_dnn = self.par_in_predicted_dnn[:, 0]
+        y_pred_temp_in_dnn = self.temp_in_predicted_dnn[:, 0]
+        y_pred_rh_in_dnn = self.rh_in_predicted_dnn[:, 0]
+        y_pred_co2_in_dnn = self.co2_in_predicted_dnn[:, 0]
+        y_pred_leaf_temp_dnn = self.leaf_temp_predicted_dnn[:, 0]
 
         # Extract predicted values from Generalized Linear Model (GL)
         y_pred_par_in_gl = self.par_in_predicted_gl
@@ -1163,13 +1164,13 @@ class MiniGreenhouse(gym.Env):
             me = np.mean(y_pred - y_true)
             return rmse, rrmse, me
 
-        # NN model metrics
-        metrics_nn = {
-            'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_nn),
-            'Temperature': calculate_metrics(y_true_temp_in, y_pred_temp_in_nn),
-            'Humidity': calculate_metrics(y_true_rh_in, y_pred_rh_in_nn),
-            'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_nn),
-            'Leaf Temperature': calculate_metrics(y_true_leaf_temp, y_pred_leaf_temp_nn)
+        # DNN model metrics
+        metrics_dnn = {
+            'PAR': calculate_metrics(y_true_par_in, y_pred_par_in_dnn),
+            'Temperature': calculate_metrics(y_true_temp_in, y_pred_temp_in_dnn),
+            'Humidity': calculate_metrics(y_true_rh_in, y_pred_rh_in_dnn),
+            'CO2': calculate_metrics(y_true_co2_in, y_pred_co2_in_dnn),
+            'Leaf Temperature': calculate_metrics(y_true_leaf_temp, y_pred_leaf_temp_dnn)
         }
 
         # GL model metrics
@@ -1194,7 +1195,7 @@ class MiniGreenhouse(gym.Env):
         print("------------------------------------------------------------------------------------")
         print("EVALUATION RESULTS :")
         for variable in ['PAR', 'Temperature', 'Humidity', 'CO2', 'Leaf Temperature']:
-            rmse_nn, rrmse_nn, me_nn = metrics_nn[variable]
+            rmse_dnn, rrmse_dnn, me_dnn = metrics_dnn[variable]
             rmse_gl, rrmse_gl, me_gl = metrics_gl[variable]
             rmse_combined, rrmse_combined, me_combined = metrics_combined[variable]
 
@@ -1213,16 +1214,16 @@ class MiniGreenhouse(gym.Env):
 
             unit_rrmse = "%"  # RRMSE is always in percentage for all variables
             
-            print(f"{variable} (NN): RMSE = {rmse_nn:.4f} {unit_rmse}, RRMSE = {rrmse_nn:.4f} {unit_rrmse}, ME = {me_nn:.4f} {unit_me}")
+            print(f"{variable} (dnn): RMSE = {rmse_dnn:.4f} {unit_rmse}, RRMSE = {rrmse_dnn:.4f} {unit_rrmse}, ME = {me_dnn:.4f} {unit_me}")
             print(f"{variable} (GL): RMSE = {rmse_gl:.4f} {unit_rmse}, RRMSE = {rrmse_gl:.4f} {unit_rrmse}, ME = {me_gl:.4f} {unit_me}")
             print(f"{variable} (Combined): RMSE = {rmse_combined:.4f} {unit_rmse}, RRMSE = {rrmse_combined:.4f} {unit_rrmse}, ME = {me_combined:.4f} {unit_me}")
 
-        return metrics_nn, metrics_gl, metrics_combined
+        return metrics_dnn, metrics_gl, metrics_combined
     
     def predict_inside_measurements_LSTM(self, target_variable, data_input):
         '''
         Predict the measurements or state variables inside mini-greenhouse using a LSTM model to combine both of 
-        the GL and NN models.
+        the GL and DNN models.
         
         Parameters:
         target_variable: str - The target variable to predict.
@@ -1231,7 +1232,7 @@ class MiniGreenhouse(gym.Env):
         Features (inputs):
             - Timesteps [5 minutes]
             - {target_variable} (Predicted GL)
-            - {target_variable} (Predicted NN)
+            - {target_variable} (Predicted DNN)
         
         Return: 
         np.array: predicted measurements inside mini-greenhouse
@@ -1254,7 +1255,7 @@ class MiniGreenhouse(gym.Env):
             data_input = pd.DataFrame(data_input)
         
          # Features required for the LSTM model
-        features = ['Timesteps [5 minutes]', f'{target_variable} (Predicted GL)', f'{target_variable} (Predicted NN)']
+        features = ['Timesteps [5 minutes]', f'{target_variable} (Predicted GL)', f'{target_variable} (Predicted DNN)']
 
         # Ensure the data_input has the required features
         for feature in features:
@@ -1308,7 +1309,7 @@ class MiniGreenhouse(gym.Env):
              
     def predicted_combined_models(self, _timesteps):
         '''
-        Combine predictions from the Neural Network (NN) and Generalized Linear Model (GL), 
+        Combine predictions from the Neural Network (DNN) and Generalized Linear Model (GL), 
         and include predictions from the LSTM model for all variables.
             
         This method updates the following attributes:
@@ -1323,15 +1324,15 @@ class MiniGreenhouse(gym.Env):
         data_input = pd.DataFrame({
             'Timesteps [5 minutes]': _timesteps,
             'CO2 In (Predicted GL)': self.co2_in_predicted_gl.flatten(),
-            'CO2 In (Predicted NN)': self.co2_in_predicted_nn[:, 0],
+            'CO2 In (Predicted DNN)': self.co2_in_predicted_dnn[:, 0],
             'Temperature In (Predicted GL)': self.temp_in_predicted_gl.flatten(),
-            'Temperature In (Predicted NN)': self.temp_in_predicted_nn[:, 0],
+            'Temperature In (Predicted DNN)': self.temp_in_predicted_dnn[:, 0],
             'RH In (Predicted GL)': self.rh_in_predicted_gl.flatten(),
-            'RH In (Predicted NN)': self.rh_in_predicted_nn[:, 0],
+            'RH In (Predicted DNN)': self.rh_in_predicted_dnn[:, 0],
             'PAR In (Predicted GL)': self.par_in_predicted_gl.flatten(),
-            'PAR In (Predicted NN)': self.par_in_predicted_nn[:, 0],
+            'PAR In (Predicted DNN)': self.par_in_predicted_dnn[:, 0],
             'Leaf Temp (Predicted GL)': self.leaf_temp_predicted_gl.flatten(),
-            'Leaf Temp (Predicted NN)': self.leaf_temp_predicted_nn[:, 0]
+            'Leaf Temp (Predicted DNN)': self.leaf_temp_predicted_dnn[:, 0]
         })
         
         # Predict inside measurements using the LSTM model

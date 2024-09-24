@@ -117,8 +117,7 @@ class MiniGreenhouse(gym.Env):
         
         # No matter if the flag_run_dnn True or not we still need to load the files for the offline training
         # Load the datasets from separate files for the DNN model
-        # file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\dataset7.xlsx"
-        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-converted.xlsx"
+        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-2.xlsx"
         
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
@@ -231,11 +230,11 @@ class MiniGreenhouse(gym.Env):
         
         # Define observation and action spaces
         self.observation_space = Box(
-            low=np.array([0.0, 10.00, 0.00, 0.00, 0.00, 0.00, 0.00]),  #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and leaf_temp
-            high=np.array([2000.0, 30.00, 90.00, 25.00, np.inf, np.inf, np.inf]), 
+            low=np.array([0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]),  #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and leaf_temp
+            high=np.array([np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]), 
             dtype=np.float64
         )
-        
+    
         self.action_space = Box(
             low=np.array([0, 0, 0], dtype=np.float32), 
             high=np.array([1, 1, 1], dtype=np.float32), 
@@ -993,7 +992,7 @@ class MiniGreenhouse(gym.Env):
                 # Plot the data
                 self.service_functions.plot_all_data(
                     'output/output_all_data.png', self.time_combined_models, 
-                    self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt,
+                    None, None, None, None, 
                     self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], 
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, 
                     self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, 
@@ -1005,7 +1004,7 @@ class MiniGreenhouse(gym.Env):
                         
             else:
                 print("---------------------------------------------------------------")
-                print("COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINER OR ONLINE")
+                print("COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
                 
                 # Evaluate predictions to get R² and MAE metrics
                 metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
@@ -1086,7 +1085,7 @@ class MiniGreenhouse(gym.Env):
             # Run with scheduled actions
             else:
                 print("-------------------------------------------------------------------")
-                print("NOT COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINER OR ONLINE")
+                print("NOT COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
                 
                 # Evaluate predictions to get R² and MAE metrics
                 # metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
@@ -1214,7 +1213,7 @@ class MiniGreenhouse(gym.Env):
 
             unit_rrmse = "%"  # RRMSE is always in percentage for all variables
             
-            print(f"{variable} (dnn): RMSE = {rmse_dnn:.4f} {unit_rmse}, RRMSE = {rrmse_dnn:.4f} {unit_rrmse}, ME = {me_dnn:.4f} {unit_me}")
+            print(f"{variable} (DNN): RMSE = {rmse_dnn:.4f} {unit_rmse}, RRMSE = {rrmse_dnn:.4f} {unit_rrmse}, ME = {me_dnn:.4f} {unit_me}")
             print(f"{variable} (GL): RMSE = {rmse_gl:.4f} {unit_rmse}, RRMSE = {rrmse_gl:.4f} {unit_rrmse}, ME = {me_gl:.4f} {unit_me}")
             print(f"{variable} (Combined): RMSE = {rmse_combined:.4f} {unit_rmse}, RRMSE = {rrmse_combined:.4f} {unit_rrmse}, ME = {me_combined:.4f} {unit_me}")
 

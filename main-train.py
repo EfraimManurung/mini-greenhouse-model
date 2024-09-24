@@ -24,12 +24,12 @@ config.environment(
     env=MiniGreenhouse,
         env_config={"flag_run": False,
                     "first_day_gl": 1,
-                    "first_day_nn": 0,
+                    "first_day_dnn": 0,
                     "season_length_gl": 1/72,
-                    "season_length_nn": 0,
+                    "season_length_dnn": 0,
                     "online_measurements": False,
                     "action_from_drl": True,
-                    "flag_run_nn": False,
+                    "flag_run_dnn": False,
                     "flag_run_gl": True,
                     "flag_run_combined_models": False,
                     "max_steps": 3
@@ -56,11 +56,11 @@ except Exception as e:
     raise RuntimeError(f"Failed to build the PPO algorithm: {e}")
 
 # Train the algorithm
-for episode in tqdm(range(1080)):  # Train for 250 episodes
+for episode in tqdm(range(396)):  # Train for 250 episodes
     result = algo.train()  # Perform training
         
 # Save the model checkpoint
-save_result = algo.save('trained-drl-models/model-calibrator-config-1')
+save_result = algo.save('trained-drl-models/model-calibrator-config-0')
 
 path_to_checkpoint = save_result
 print(

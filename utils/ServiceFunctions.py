@@ -514,8 +514,6 @@ class ServiceFunctions:
         df.to_excel(filename, index=False)
         print(f"Rewards data successfully exported to {filename}")
     
-    import pandas as pd
-
     def export_evaluated_data_to_excel_table(self, filename, metrics_dnn, metrics_gl, metrics_combined):
         '''
         Export the evaluation metrics (RMSE, RRMSE, and ME) for DNN, GL, and Combined models to an Excel file.
@@ -599,7 +597,7 @@ class ServiceFunctions:
         # print("JSON DATA: ", json_data)
         return json_data
     
-    def publish_mqtt_data(self, json_data, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/drl-controls"):
+    def publish_mqtt_data(self, json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls"):
         '''
         Publish JSON data to an MQTT broker.
         
@@ -619,7 +617,7 @@ class ServiceFunctions:
         self.client_pub.connect(broker, port, 60)
         self.client_pub.loop_start()
 
-    def get_outdoor_indoor_measurements(self, broker="192.168.1.131", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements"):
+    def get_outdoor_indoor_measurements(self, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements"):
         '''
         Initialize outdoor measurements.
         
@@ -646,7 +644,7 @@ class ServiceFunctions:
             # self.process_received_data(data) 
             
             # Process the received data and return it
-            self.return_outdoor_measurements = self.process_received_data(data)
+            self.return_indoor_outdoor_measurements = self.process_received_data(data)
         
             # Set the flag to indicate a message was received
             self.message_received = True
@@ -666,18 +664,19 @@ class ServiceFunctions:
         self.client_sub.loop_stop()  # Ensure the loop is stopped
         self.client_sub.disconnect()  # Disconnect the client
         
-        return self.return_outdoor_measurements # Return the processed
-
+        return self.return_indoor_outdoor_measurements # Return the processed
+    
     def process_received_data(self, data):
         '''
-        Process the outdoor measurements and .
+        Process the outdoor and indoor measurements, handling NaN values.
         
-        Outdoor measurements:
+        Outdoor and indoor measurements:
         - time: from main loop iteration in 1 s
         - lux: Need to be converted to W / m^2
         - temperature
         - humidity
         - co2
+        - leaf temperature 
         '''
         
         # Extract variables
@@ -689,9 +688,33 @@ class ServiceFunctions:
         par_in = data.get("par_in", [])
         temp_in = data.get("temp_in", [])
         hum_in = data.get("hum_in", [])
-        co2_in= data.get("co2_in", [])
+        co2_in = data.get("co2_in", [])
+        leaf_temp = data.get("leaf_temp", [])
+
+        # Define a helper function to replace NaN with the previous value
+        def replace_nan_with_previous(values):
+            for i in range(len(values)):
+                if np.isnan(values[i]):
+                    # If it's the first value and NaN, replace it with 0 (or another default)
+                    if i == 0:
+                        values[i] = 0
+                    else:
+                        # Replace NaN with the previous non-NaN value
+                        values[i] = values[i-1]
+            return values
         
-        # Print the extracted variables
+        # Handle NaN values in all the data lists
+        par_out = replace_nan_with_previous(par_out)
+        temp_out = replace_nan_with_previous(temp_out)
+        hum_out = replace_nan_with_previous(hum_out)
+        co2_out = replace_nan_with_previous(co2_out)
+        par_in = replace_nan_with_previous(par_in)
+        temp_in = replace_nan_with_previous(temp_in)
+        hum_in = replace_nan_with_previous(hum_in)
+        co2_in = replace_nan_with_previous(co2_in)
+        leaf_temp = replace_nan_with_previous(leaf_temp)
+
+        # Print the extracted variables after handling NaN
         print("Received from ONLINE MEASUREMENTS")
         print("Time:", time)
         print("PAR Out:", par_out)
@@ -702,17 +725,9 @@ class ServiceFunctions:
         print("Temperature In:", temp_in)
         print("Humidity In:", hum_in)
         print("CO2 In:", co2_in)
-        
-        # Create outdoor measurements dictionary
-        outdoor_measurements = {
-            'time': np.array(time).reshape(-1, 1),
-            'par_out': np.array(par_out).reshape(-1, 1),
-            'temp_out': np.array(temp_out).reshape(-1, 1),
-            'hum_out': np.array(hum_out).reshape(-1, 1),
-            'co2_out': np.array(co2_out).reshape(-1, 1),
-        }
-        
-        # Create outdoor measurements dictionary
+        print("Leaf Temperature:", leaf_temp)
+
+        # Create indoor and outdoor measurements dictionary
         outdoor_indoor_measurements = {
             'time': np.array(time).reshape(-1, 1),
             'par_out': np.array(par_out).reshape(-1, 1),
@@ -722,10 +737,11 @@ class ServiceFunctions:
             'par_in': np.array(par_in).reshape(-1, 1),
             'temp_in': np.array(temp_in).reshape(-1, 1),
             'hum_in': np.array(hum_in).reshape(-1, 1),
-            'co2_in': np.array(co2_in).reshape(-1, 1)
+            'co2_in': np.array(co2_in).reshape(-1, 1),
+            'leaf_temp': np.array(leaf_temp).reshape(-1, 1)
         }
-        
-        # Save outdoor measurements to .mat file
-        sio.savemat('outdoor.mat', outdoor_measurements)
+
+        # Save measurements to a .mat file
+        sio.savemat('outdoor-indoor.mat', outdoor_indoor_measurements)
         
         return outdoor_indoor_measurements

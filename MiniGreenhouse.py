@@ -156,7 +156,7 @@ class MiniGreenhouse(gym.Env):
             if self.online_measurements == True:
 
                 # Run the script with the updated outdoor measurements for the first time
-                self.run_matlab_script('outdoor.mat', None, None)
+                self.run_matlab_script('outdoor-indoor.mat', None, None)
             else:
                 # Run the script with empty parameter
                 self.run_matlab_script()
@@ -288,7 +288,7 @@ class MiniGreenhouse(gym.Env):
             print("load_excel_or_mqtt_data from ONLINE MEASUREMENTS")
             
             # Initialize outdoor measurements, to get the outdoor measurements
-            outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements()
+            outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements(broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements")
             
             # Convert outdoor_indoor_measurements to a DataFrame
             self.step_data = pd.DataFrame({
@@ -720,7 +720,7 @@ class MiniGreenhouse(gym.Env):
         os.remove('fruit.mat')    # fruit growth
 
         if self.online_measurements == True:
-            os.remove('outdoor.mat')  # outdoor measurements
+            os.remove('outdoor-indoor.mat')  # outdoor measurements
         
     def done(self):
         '''
@@ -820,7 +820,7 @@ class MiniGreenhouse(gym.Env):
                                                 heater)
             
             # Publish controls to the raspberry pi (IoT system client)
-            self.service_functions.publish_mqtt_data(json_data)
+            self.service_functions.publish_mqtt_data(json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls")
 
         # Create control dictionary
         controls = {
@@ -885,7 +885,7 @@ class MiniGreenhouse(gym.Env):
 
         # Run the script with the updated state variables
         if self.online_measurements == True:
-            self.run_matlab_script('outdoor.mat', 'indoor.mat', 'fruit.mat')
+            self.run_matlab_script('outdoor-indoor.mat', 'indoor.mat', 'fruit.mat')
         else:
             self.run_matlab_script(None, 'indoor.mat', 'fruit.mat')
         

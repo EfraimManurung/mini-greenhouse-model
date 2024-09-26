@@ -25,7 +25,7 @@ from MiniGreenhouse import MiniGreenhouse
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-0')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-1')
 
 # Make the calibratorModel instance
 env = MiniGreenhouse({"flag_run": True,
@@ -33,12 +33,12 @@ env = MiniGreenhouse({"flag_run": True,
                     "first_day_dnn": 0,
                     "season_length_gl": 1/72,
                     "season_length_dnn": 0,
-                    "online_measurements": False,
+                    "online_measurements": True,
                     "action_from_drl": True,
                     "flag_run_dnn": True,
                     "flag_run_gl": True,
                     "flag_run_combined_models": True,
-                    "max_steps": 360
+                    "max_steps": 6
                     })
 
 # Get the initial observation (should be: [0.0] for the starting position).

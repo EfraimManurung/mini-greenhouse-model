@@ -105,6 +105,11 @@ class MiniGreenhouse(gym.Env):
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
         self.flag_run_combined_models = env_config.get("flag_run_combined_models", True) # Default is true, flag to run the LSTM model
         
+        is_mature = env_config.get("is_mature", False) # The crops are mature or not
+        
+        # Convert Python boolean to integer (1 for True, 0 for False)
+        self.is_mature_matlab = int(is_mature)
+        
         # Initiate and max steps
         self.max_steps = env_config.get("max_steps", 3) # One episode = 3 steps = 1 hour, because 1 step = 20 minutes
     
@@ -117,7 +122,8 @@ class MiniGreenhouse(gym.Env):
         
         # No matter if the flag_run_dnn True or not we still need to load the files for the offline training
         # Load the datasets from separate files for the DNN model
-        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-2.xlsx"
+        # file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-2.xlsx"
+        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\iot-datasets-train-lstm.xlsx"
         
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
@@ -275,7 +281,7 @@ class MiniGreenhouse(gym.Env):
         if outdoor_file is None:
             outdoor_file = []
         
-        self.eng.DrlGlEnvironment(self.season_length_gl, self.first_day_gl, 'controls.mat', outdoor_file, indoor_file, fruit_file, nargout=0)
+        self.eng.DrlGlEnvironment(self.season_length_gl, self.first_day_gl, 'controls.mat', outdoor_file, indoor_file, fruit_file, self.is_mature_matlab, nargout=0)
 
     def load_excel_or_mqtt_data(self, _action_drl):
         '''

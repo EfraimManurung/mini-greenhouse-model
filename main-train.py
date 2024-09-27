@@ -32,7 +32,7 @@ config.environment(
                     "flag_run_dnn": False,
                     "flag_run_gl": True,
                     "flag_run_combined_models": False,
-                    "max_steps": 6
+                    "max_steps": 9
                     })
 
 config.training(

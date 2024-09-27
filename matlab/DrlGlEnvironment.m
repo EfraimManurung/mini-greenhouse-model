@@ -1,4 +1,4 @@
-function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, indoorFile, fruitFile)    
+function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, indoorFile, fruitFile, is_mature)    
     % Use for the environment in the DRL environment
     % Using createGreenLightModel
     %
@@ -17,9 +17,11 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
 
     % Choice of lamp
     lampType = 'led'; 
+
+    % Get LSTM data training for or not
     
     % From IoT dataset
-    [outdoor_iot, controls_iot, startTime] = loadMiniGreenhouseData(firstDay, seasonLength);
+    [outdoor_iot, controls_iot, startTime] = loadMiniGreenhouseData(firstDay, seasonLength, is_mature);
 
     % Load DRL controls from the .mat file
     controls = load(controlsFile);
@@ -150,17 +152,20 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     % Check the setGlinit.m for more information
     % Default values    
     if isempty(fruitFile)
-        % start with small crop
-        % drl_env.x.cLeaf.val = 0.7*6240;     
-        % drl_env.x.cStem.val = 0.25*6240;    
-        % drl_env.x.cFruit.val = 0.05*6240;   
-        % drl_env.x.tCanSum.val = 0;
+        if is_mature == 1
+            % Start with a mature crop
+            drl_env.x.cLeaf.val = 2.8e5;     
+            drl_env.x.cStem.val = 0.9e5;    
+            drl_env.x.cFruit.val = 2.5e5;  
+            drl_env.x.tCanSum.val = 3000;
+        else
+            % start with small crop
+            drl_env.x.cLeaf.val = 0.7*6240;     
+            drl_env.x.cStem.val = 0.25*6240;    
+            drl_env.x.cFruit.val = 0.05*6240;   
+            drl_env.x.tCanSum.val = 0;
+        end
 
-        % Start with a mature crop
-        drl_env.x.cLeaf.val = 2.8e5;     
-        drl_env.x.cStem.val = 0.9e5;    
-        drl_env.x.cFruit.val = 2.5e5;  
-        drl_env.x.tCanSum.val = 3000;
     else 
         % Load DRL controls from the .mat file
         fruit_file = load(fruitFile);

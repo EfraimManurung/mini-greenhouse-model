@@ -1,5 +1,5 @@
 '''
-Calibrator model with Artifical Neural Networks algorithm and glysics based model (the GreenLight model). 
+Mini-greenhouse environment with calibration model (Deep Neural Networks algorithm and physics based model (the GreenLight model)). 
 In this class we will combine the DNN model with the GreenLight model.
 
 Author: Efraim Manurung
@@ -24,15 +24,27 @@ d3(t)  Outdoor temperature [°C]                       u3(t)  Heating [-]
 d4(t)  Outdoor humidity [%]
 ---------------------------------------------------------------------------------------------------------
 
-based on Table 1, we want to predict the state variable x(t) with control signal u(t) and disturbance d(t)
+based on Table 1, we want to predict the state variable x(t) except the crop development stage 
+with control signal u(t) and disturbance d(t)
  
 Project sources:
-    - Tensor flow
-    - Github repositories
+    - https://github.com/davkat1/GreenLight
+    - 
 Other sources:
-    -
+    - 
     -
 References:
+    - David Katzin, Simon van Mourik, Frank Kempkes, and Eldert J. Van Henten. 2020. “GreenLight - An Open Source Model for 
+      Greenhouses with Supplemental Lighting: Evaluation of Heat Requirements under LED and HPS Lamps.” 
+      Biosystems Engineering 194: 61–81. https://doi.org/10.1016/j.biosystemseng.2020.03.010
+    - Literature used:
+        [1] Vanthoor, B., Stanghellini, C., van Henten, E. J. & de Visser, P. H. B. 
+            A methodology for model-based greenhouse design: Part 1, a greenhouse climate 
+            model for a broad range of designs and climates. Biosyst. Eng. 110, 363-377 (2011).
+        [2] Vanthoor, B., de Visser, P. H. B., Stanghellini, C. & van Henten, E. J. 
+            A methodology for model-based greenhouse design: Part 2, description and 
+            validation of a tomato yield model. Biosyst. Eng. 110, 378-395 (2011).
+        [3] Vanthoor, B. A model based greenhouse design method. (Wageningen University, 2011).
     - 
 '''
 
@@ -95,11 +107,10 @@ class MiniGreenhouse(gym.Env):
         self.first_day_dnn = env_config.get("first_day_dnn", 0) # 1 / 72 in matlab is 1 step in this DNN model, 20 minutes
         
         # Define the season length parameter
-        # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
-        self.season_length_gl = env_config.get("season_length_gl", 1 / 72) #* 3/4
-        self.season_length_dnn = self.first_day_dnn #env_config.get("season_length_dnn", 0) # so we can substract the timesteps, that is why we used the season_length_dnn from the first_day
+        self.season_length_gl = env_config.get("season_length_gl", 1 / 72) # 1 / 72 * 24 [hours] * 60 [minutes / hours] = 20 minutes  
+        self.season_length_dnn = self.first_day_dnn # so we can substract the timesteps, that is why we used the season_length_dnn from the first_day
         
-        self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the IoT system 
+        self.online_measurements = env_config.get("online_measurements", False) # Use online measurements or not from the real-time measurements from IoT system 
         self.action_from_drl = env_config.get("action_from_drl", False) # Default is false, and we will use the action from offline datasets
         self.flag_run_dnn = env_config.get("flag_run_dnn", False) # Default is false, flag to run the Neural Networks model
         self.flag_run_gl = env_config.get("flag_run_gl", True) # Default is true, flag to run the green light model
@@ -122,16 +133,20 @@ class MiniGreenhouse(gym.Env):
         
         # No matter if the flag_run_dnn True or not we still need to load the files for the offline training
         # Load the datasets from separate files for the DNN model
-        # file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\minigreenhouse-leaf-2.xlsx"
-        file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\iot-datasets-train-lstm.xlsx"
-        
+        if is_mature == True:
+            print("IS MATURE - TRUE, USING MATURE CROPS DATASETS")
+            file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\september-iot-datasets-test-mature-crops.xlsx"
+        else:
+            if is_mature == False and self.flag_run == False:
+                print("IS MATURE - FALSE, FLAG RUN - FALSE, USING IOT DATASETS TO TRAIN DRL MODEL")
+                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\iot-datasets-train-drl.xlsx"
+            elif is_mature == False and self.flag_run == True:
+                print("IS MATURE - FALSE, FLAG RUN - TRUE, USING SMALL CROPS DATASETS")
+                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\june-iot-datasets-test-small-crops.xlsx"
+            
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
-    
-        # Display the first few rows of the dataframe
-        print("MiniGreenhouse DATA Columns / Variables (DEBUG): \n")
-        print(self.mgh_data.head())
-        
+                
         # Initialize lists to store control values
         self.ventilation_list = []
         self.toplights_list = []
@@ -226,12 +241,6 @@ class MiniGreenhouse(gym.Env):
             - fruit_leaf: Carbohydrates in leaves [mg{CH2O} m^{-2}]                     Equation 4, 5 [2]
             - fruit_stem: Carbohydrates in stem [mg{CH2O} m^{-2}]                       Equation 6, 7 [2]
             - fruit_cbuf: Carbohydrates in buffer [mg{CH2O} m^{-2}]                     Equation 1, 2 [2]
-        
-        The state x(t) variables:
-        - Temperature (°C) 
-        - Relative Humidity (%) 
-        - CO2 Concentration (ppm) 
-        - PAR Inside (W/m^2) 
         '''
         
         # Define observation and action spaces
@@ -586,6 +595,7 @@ class MiniGreenhouse(gym.Env):
         new_fruit_leaf_predicted_gl = data['fruit_leaf'].flatten()[-4:]
         new_fruit_stem_predicted_gl = data['fruit_stem'].flatten()[-4:]
         new_fruit_dw_predicted_gl = data['fruit_dw'].flatten()[-4:]
+        new_fruit_cbuf_predicted_gl = data['fruit_cbuf'].flatten()[-4:]
         new_fruit_tcansum_predicted_gl = data['fruit_tcansum'].flatten()[-4:]
         new_leaf_temp_predicted_gl = data['leaf_temp'].flatten()[-4:]
 
@@ -598,6 +608,7 @@ class MiniGreenhouse(gym.Env):
             self.fruit_leaf_predicted_gl = new_fruit_leaf_predicted_gl
             self.fruit_stem_predicted_gl = new_fruit_stem_predicted_gl
             self.fruit_dw_predicted_gl = new_fruit_dw_predicted_gl
+            self.fruit_cbuf_predicted_gl = new_fruit_cbuf_predicted_gl
             self.fruit_tcansum_predicted_gl = new_fruit_tcansum_predicted_gl
             self.leaf_temp_predicted_gl = new_leaf_temp_predicted_gl
         else:
@@ -609,6 +620,7 @@ class MiniGreenhouse(gym.Env):
             self.fruit_leaf_predicted_gl = np.concatenate((self.fruit_leaf_predicted_gl, new_fruit_leaf_predicted_gl))
             self.fruit_stem_predicted_gl = np.concatenate((self.fruit_stem_predicted_gl, new_fruit_stem_predicted_gl))
             self.fruit_dw_predicted_gl = np.concatenate((self.fruit_dw_predicted_gl, new_fruit_dw_predicted_gl))
+            self.fruit_cbuf_predicted_gl = np.concatenate((self.fruit_cbuf_predicted_gl, new_fruit_cbuf_predicted_gl))
             self.fruit_tcansum_predicted_gl = np.concatenate((self.fruit_tcansum_predicted_gl, new_fruit_tcansum_predicted_gl))
             self.leaf_temp_predicted_gl = np.concatenate((self.leaf_temp_predicted_gl, new_leaf_temp_predicted_gl))
             
@@ -640,6 +652,7 @@ class MiniGreenhouse(gym.Env):
             print("self.temp_in_predicted_combined_models : ", self.temp_in_predicted_combined_models[-1])
             print("self.rh_in_predicted_combined_models : ", self.rh_in_predicted_combined_models[-1])
             print("self.par_in_predicted_combined_models : ", self.par_in_predicted_combined_models[-1])
+            print("self.leaf_temp_predicted_combined_models : ", self.leaf_temp_predicted_combined_models[-1] )
             
             #in order: co2_in, temp_in, rh_in, PAR_in, fruit_dw, fruit_tcansum and leaf_temp
             return np.array([
@@ -686,7 +699,7 @@ class MiniGreenhouse(gym.Env):
         Coefficients        Values          Details
         w_r_y1              1               Fruit dry weight 
         w_r_a1              0.005           Ventilation
-        w_r_a2              0.015           Toplights
+        w_r_a2              0.010           Toplights
         w_r_a3              0.001           Heater
         
         Returns:
@@ -697,7 +710,7 @@ class MiniGreenhouse(gym.Env):
         # Need to be determined to make the r_k unitless
         w_r_y1 = 1          # Fruit dry weight 
         w_r_a1 = 0.005      # Ventilation
-        w_r_a2 = 0.015      # Toplights
+        w_r_a2 = 0.010      # Toplights
         w_r_a3 = 0.001      # Heater
         
         # Give initial reward 
@@ -756,8 +769,7 @@ class MiniGreenhouse(gym.Env):
                 return True
         else:
             if self.current_step >= self.max_steps:
-                # Delete all files
-                # self.delete_files()
+
                 return True
             
         return False
@@ -852,7 +864,7 @@ class MiniGreenhouse(gym.Env):
             
             print("USE INDOOR GREENLIGHT")
             # Use the data from the GreenLight model
-            # Convert co2_in ppm
+            # Convert co2_in ppm using service functions
             co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_gl[-4:], self.co2_in_predicted_gl[-4:])
             
             # Convert Relative Humidity (RH) to Pressure in Pa
@@ -877,6 +889,7 @@ class MiniGreenhouse(gym.Env):
             'fruit_leaf': self.fruit_leaf_predicted_gl[-1:].astype(float).reshape(-1, 1),
             'fruit_stem': self.fruit_stem_predicted_gl[-1:].astype(float).reshape(-1, 1),
             'fruit_dw': self.fruit_dw_predicted_gl[-1:].astype(float).reshape(-1, 1),
+            'fruit_cbuf': self.fruit_cbuf_predicted_gl[-1:].astype(float).reshape(-1, 1),
             'fruit_tcansum': self.fruit_tcansum_predicted_gl[-1:].astype(float).reshape(-1, 1),
             'leaf_temp': self.leaf_temp_predicted_gl[-1:].astype(float).reshape(-1,1)
         }
@@ -904,7 +917,6 @@ class MiniGreenhouse(gym.Env):
             self.predicted_inside_measurements_dnn()
         
         time_steps_formatted = list(range(0, int(self.season_length_dnn - self.first_day_dnn)))
-        # print("time_steps_formatted 2 : ", time_steps_formatted)
         
         self.format_time_steps(time_steps_formatted)
         
@@ -1036,8 +1048,7 @@ class MiniGreenhouse(gym.Env):
                                                              self.leaf_temp_excel_mqtt,
                                                              self.leaf_temp_predicted_dnn,
                                                              self.leaf_temp_predicted_gl,
-                                                             self.leaf_temp_predicted_combined_models) #,
-                                                             #metrics_dnn, metrics_gl, metrics_combined)
+                                                             self.leaf_temp_predicted_combined_models) 
             
                 # Plot the data
                 self.service_functions.plot_all_data(
@@ -1093,9 +1104,6 @@ class MiniGreenhouse(gym.Env):
                 print("-------------------------------------------------------------------")
                 print("NOT COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
                 
-                # Evaluate predictions to get R² and MAE metrics
-                # metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
-                
                 # Save all the data in an Excel file                
                 self.service_functions.export_to_excel(
                     file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
@@ -1105,9 +1113,6 @@ class MiniGreenhouse(gym.Env):
                     None, None, None, None, None
                 )
                 
-                # Save the metrics data in an Excel file as table format
-                # self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_dnn, metrics_gl, metrics_combined)
-
                 # Save the rewards list 
                 self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
                 
@@ -1341,7 +1346,6 @@ class MiniGreenhouse(gym.Env):
         })
         
         # Predict inside measurements using the LSTM model
-        # new_time_combined = data_input['Timesteps [5 minutes]'][-4:]
         new_par_in_predicted_combined = self.predict_inside_measurements_LSTM("PAR In", data_input)[-4:]
         new_temp_in_predicted_combined = self.predict_inside_measurements_LSTM("Temperature In", data_input)[-4:]
         new_rh_in_predicted_combined = self.predict_inside_measurements_LSTM("RH In", data_input)[-4:]
@@ -1350,8 +1354,6 @@ class MiniGreenhouse(gym.Env):
         
         # Initialize or update combined model predictions
         if not hasattr(self, 'co2_in_predicted_combined_models'):
-            # First initialization for all attributes
-            # self.time_combined_models = new_time_combined
             self.co2_in_predicted_combined_models = new_co2_in_predicted_combined
             self.temp_in_predicted_combined_models = new_temp_in_predicted_combined
             self.rh_in_predicted_combined_models = new_rh_in_predicted_combined
@@ -1359,7 +1361,6 @@ class MiniGreenhouse(gym.Env):
             self.leaf_temp_predicted_combined_models = new_leaf_temp_predicted_combined
         else:
             # Concatenate with existing data if already initialized
-            # self.time_combined_models = np.concatenate((self.time_combined_models, new_time_combined))
             self.co2_in_predicted_combined_models = np.concatenate((self.co2_in_predicted_combined_models, new_co2_in_predicted_combined))
             self.temp_in_predicted_combined_models = np.concatenate((self.temp_in_predicted_combined_models, new_temp_in_predicted_combined))
             self.rh_in_predicted_combined_models = np.concatenate((self.rh_in_predicted_combined_models, new_rh_in_predicted_combined))

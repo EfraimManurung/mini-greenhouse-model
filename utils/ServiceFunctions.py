@@ -4,10 +4,10 @@ Service Functions for Deep Reinforcement Learning mini-greenhouse
 Author: Efraim Manurung
 MSc Thesis in Information Technology Group, Wageningen University
 
-efraim.efraimpartoginahotasi@wur.nl
 efraim.manurung@gmail.com
 '''
 
+# Import libraries
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -593,8 +593,6 @@ class ServiceFunctions:
 
         json_data = json.dumps(data, indent=4)
         
-        # For debugging JSON data
-        # print("JSON DATA: ", json_data)
         return json_data
     
     def publish_mqtt_data(self, json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls"):
@@ -635,14 +633,10 @@ class ServiceFunctions:
             client.subscribe(topic)
             
         def on_message(client, userdata, msg):
-            # print(msg.topic + " " + str(msg.payload.decode()))
+            # print(msg.topic + " " + str(msg.payload.decode())) # debugging when receiving the the JSON payload
             # Parse the JSON data
             data = json.loads(msg.payload.decode())
-            
-            # Process the received data
-            # Change the matlab file in here
-            # self.process_received_data(data) 
-            
+                        
             # Process the received data and return it
             self.return_indoor_outdoor_measurements = self.process_received_data(data)
         

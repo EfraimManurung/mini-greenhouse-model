@@ -5,8 +5,11 @@ Author: Efraim Manurung
 MSc Thesis in Information Technology Group, Wageningen University
 
 efraim.manurung@gmail.com
+
+Read more information in the MiniGreenhouse class.
 '''
 
+# Import tensorflow 
 import tensorflow as tf
 
 # Enable eager execution
@@ -25,7 +28,7 @@ from MiniGreenhouse import MiniGreenhouse
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-1')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-3-checkpoint')
 
 # Make the calibratorModel instance
 env = MiniGreenhouse({"flag_run": True,
@@ -33,12 +36,13 @@ env = MiniGreenhouse({"flag_run": True,
                     "first_day_dnn": 0,
                     "season_length_gl": 1/72,
                     "season_length_dnn": 0,
-                    "online_measurements": True,
+                    "online_measurements": False,
                     "action_from_drl": True,
                     "flag_run_dnn": True,
                     "flag_run_gl": True,
                     "flag_run_combined_models": True,
-                    "max_steps": 18
+                    "is_mature": False,
+                    "max_steps": 5 * 72
                     })
 
 # Get the initial observation (should be: [0.0] for the starting position).
@@ -47,7 +51,7 @@ terminated = truncated = False
 total_rewards = 0.0
 total_rewards_list = [] # List to collect rewards
 
-# Play one episode
+# Play episodes
 while not terminated and not truncated:    
     # Make some delay, so it is easier to see
     time.sleep(1.0)

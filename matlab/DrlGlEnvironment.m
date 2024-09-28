@@ -157,12 +157,14 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
             drl_env.x.cLeaf.val = 2.8e5;     
             drl_env.x.cStem.val = 0.9e5;    
             drl_env.x.cFruit.val = 2.5e5;  
+            drl_env.x.cBuf.val = 0;
             drl_env.x.tCanSum.val = 3000;
         else
             % start with small crop
             drl_env.x.cLeaf.val = 0.7*6240;     
             drl_env.x.cStem.val = 0.25*6240;    
-            drl_env.x.cFruit.val = 0.05*6240;   
+            drl_env.x.cFruit.val = 0.05*6240;  
+            drl_env.x.cBuf.val = 0;
             drl_env.x.tCanSum.val = 0;
         end
 
@@ -176,7 +178,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
         fprintf('      fruit_dw: %.2f\n', fruit_file.fruit_dw);
 
         % Ensure that the required fields exist in fruit_file
-        required_fields = {'time', 'fruit_leaf', 'fruit_stem', 'fruit_dw', 'fruit_tcansum', 'leaf_temp'};
+        required_fields = {'time', 'fruit_leaf', 'fruit_stem', 'fruit_dw', 'fruit_cbuf', 'fruit_tcansum', 'leaf_temp'};
         for i = 1:length(required_fields)
             if ~isfield(fruit_file, required_fields{i})
                 error(['The fruit file does not contain the required field: ', required_fields{i}]);
@@ -188,6 +190,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
         drl_env.x.cStem.val = fruit_file.fruit_stem;    
         drl_env.x.cFruit.val = fruit_file.fruit_dw;
         drl_env.x.tCanSum.val = fruit_file.fruit_tcansum;
+        drl_env.x.cBuf.val = fruit_file.fruit_cbuf;
         drl_env.x.tCan.val = fruit_file.leaf_temp;
     end
     
@@ -214,16 +217,17 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     fruit_leaf = drl_env.x.cLeaf.val(:, 2);             % Fruit leaf
     fruit_stem = drl_env.x.cStem.val(:, 2);             % Fruit stem
     fruit_dw = drl_env.x.cFruit.val(:, 2);              % Fruit dry weight
+    fruit_cbuf = drl_env.x.cBuf.val(:, 2);              % Carbohydrates in buffer [mg{CH2O} m^{-2} s^{-1}]
     fruit_tcansum = drl_env.x.tCanSum.val(:, 2);        % Crop development stage [°C day s^{-1}]
-    leaf_temp = drl_env.x.tCan.val(:, 2);              % Crop temperature [°C]
+    leaf_temp = drl_env.x.tCan.val(:, 2);               % Crop temperature [°C]
         
     % Save the extracted data to a .mat file
-    save('drl-env.mat', 'time', 'temp_in', 'rh_in', 'co2_in', 'PAR_in', 'fruit_leaf', 'fruit_stem', 'fruit_dw', 'fruit_tcansum', 'leaf_temp');
+    save('drl-env.mat', 'time', 'temp_in', 'rh_in', 'co2_in', 'PAR_in', 'fruit_leaf', 'fruit_stem', 'fruit_dw', 'fruit_cbuf', 'fruit_tcansum', 'leaf_temp');
     
     %% Print the values in tabular format
-    fprintf('Time (s)\tIndoor Temp (°C)\tIndoor Humidity (%%)\tIndoor CO2 (ppm)\tPAR Inside (W/m²)\tFruit Dry Weight (g/m²)\tCrop Development Stage [°C day s^{-1}]\tCrop Temperature [°C]\n');
+    fprintf('Time (s)\tIndoor Temp (°C)\tIndoor Humidity (%%)\tIndoor CO2 (ppm)\tPAR Inside (W/m²)\tFruit Dry Weight (g/m²)\tFruit Dry Weight (g/m²)\tFruit Carbohydrates Buffer [mg{CH2O} m^{-2} s^{-1}]\tCrop Development Stage [°C day s^{-1}]\tCrop Temperature [°C]\n');
     for i = 1:length(time)
-        fprintf('%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n', time(i), temp_in(i), rh_in(i), co2_in(i), PAR_in(i), fruit_dw(i), fruit_tcansum(i), leaf_temp(i));
+        fprintf('%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n', time(i), temp_in(i), rh_in(i), co2_in(i), PAR_in(i), fruit_dw(i), fruit_cbuf(i), fruit_tcansum(i), leaf_temp(i));
     end
 
     %% Clear the workspace

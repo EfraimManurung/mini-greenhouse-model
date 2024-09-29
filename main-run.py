@@ -28,7 +28,7 @@ from MiniGreenhouse import MiniGreenhouse
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
 
-ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-calibrator-config-3-checkpoint')
+ppo_model_from_checkpoint = Algorithm.from_checkpoint('trained-drl-models/model-checkpoint')
 
 # Make the calibratorModel instance
 env = MiniGreenhouse({"flag_run": True,

@@ -142,7 +142,7 @@ class MiniGreenhouse(gym.Env):
                 file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\iot-datasets-train-drl.xlsx"
             elif is_mature == False and self.flag_run == True:
                 print("IS MATURE - FALSE, FLAG RUN - TRUE, USING SMALL CROPS DATASETS")
-                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\june-iot-datasets-test-small-crops.xlsx"
+                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\august-iot-datasets-test-small-crops.xlsx"
             
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
@@ -790,7 +790,7 @@ class MiniGreenhouse(gym.Env):
         Returns:
             New observation, reward, terminated-flag (frome done method), truncated-flag, info-dict (empty).
         '''
-         
+        
         # Increment the current step
         self.current_step += 1
         print("")
@@ -798,26 +798,15 @@ class MiniGreenhouse(gym.Env):
         print("----------------------------------")
         print("CURRENT STEPS: ", self.current_step)
         
-        if self.action_from_drl == True and _action_drl is not None:
-            # Get the action from the DRL model 
-            print("ACTION: ", _action_drl)
-            
-            # Convert actions to discrete values
-            ventilation = 1 if _action_drl[0] >= 0.5 else 0
-            toplights = 1 if _action_drl[1] >= 0.5 else 0
-            heater = 1 if _action_drl[2] >= 0.5 else 0
-            
-            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-            ventilation = np.full(4, ventilation)
-            toplights = np.full(4, toplights)
-            heater = np.full(4, heater)
-
-        else:
-            # Get the actions from the excel file (offline datasets)
-            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-            ventilation = self.ventilation[-4:]
-            toplights = self.toplights[-4:]
-            heater = self.heater[-4:]
+        # Load the updated data from the excel or from mqtt, for online or offline measurements, we still need to call the data
+        # Get the oudoor measurements
+        self.load_excel_or_mqtt_data(_action_drl)
+        
+        # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
+        time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+        ventilation = self.ventilation[-4:]
+        toplights = self.toplights[-4:]
+        heater = self.heater[-4:]
                                  
         print("CONVERTED ACTION")
         print("ventilation: ", ventilation)
@@ -897,11 +886,6 @@ class MiniGreenhouse(gym.Env):
         # Save the fruit growth to .mat file
         sio.savemat('fruit.mat', fruit_growth)
         
-        # Load the updated data from the excel or from mqtt, for online or offline measurements, 
-        # we still need to call the data
-        # Get the oudoor measurements
-        self.load_excel_or_mqtt_data(_action_drl)
-
         # Run the script with the updated state variables
         if self.online_measurements == True:
             self.run_matlab_script('outdoor-indoor.mat', 'indoor.mat', 'fruit.mat')

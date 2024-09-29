@@ -1,1 +1,0 @@
-{"type": "Algorithm", "checkpoint_version": "1.1", "format": "cloudpickle", "state_file": "trained-drl-models/model-calibrator-config-0\\algorithm_state.pkl", "policy_ids": ["default_policy"], "ray_version": "3.0.0.dev0", "ray_commit": "baffe070eb64f9dc36797e9cab59214da9a3b811"}

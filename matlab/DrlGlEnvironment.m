@@ -21,7 +21,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     % Get LSTM data training for or not
     
     % From IoT dataset
-    [outdoor_iot, controls_iot, startTime] = loadMiniGreenhouseData(firstDay, seasonLength, is_mature);
+    [outdoor_iot, controls_iot, startTime] = loadMiniGreenhouseDrlData(firstDay, seasonLength, is_mature);
 
     % Load DRL controls from the .mat file
     controls = load(controlsFile);

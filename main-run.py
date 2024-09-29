@@ -42,7 +42,7 @@ env = MiniGreenhouse({"flag_run": True,
                     "flag_run_gl": True,
                     "flag_run_combined_models": True,
                     "is_mature": False,
-                    "max_steps": 5 * 72
+                    "max_steps": 6
                     })
 
 # Get the initial observation (should be: [0.0] for the starting position).

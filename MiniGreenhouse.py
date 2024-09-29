@@ -135,15 +135,16 @@ class MiniGreenhouse(gym.Env):
         # Load the datasets from separate files for the DNN model
         if is_mature == True and self.flag_run == True:
             print("IS MATURE - TRUE, USING MATURE CROPS DATASETS")
-            file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\september-iot-datasets-test-mature-crops.xlsx"
+            file_path = r"matlab\Mini Greenhouse\september-iot-datasets-test-mature-crops.xlsx"
         else:
             if is_mature == False and self.flag_run == False:
                 print("IS MATURE - FALSE, FLAG RUN - FALSE, USING IOT DATASETS TO TRAIN DRL MODEL")
-                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\iot-datasets-train-drl.xlsx"
+                file_path = r"matlab\Mini Greenhouse\iot-datasets-train-drl.xlsx"
             elif is_mature == False and self.flag_run == True:
                 print("IS MATURE - FALSE, FLAG RUN - TRUE, USING SMALL CROPS DATASETS")
-                file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\august-iot-datasets-test-small-crops.xlsx"
-            
+                # file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\august-iot-datasets-test-small-crops.xlsx"
+                file_path = r"matlab\Mini Greenhouse\june-iot-datasets-test-small-crops.xlsx"
+                
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
                 

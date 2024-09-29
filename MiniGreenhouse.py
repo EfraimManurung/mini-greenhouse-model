@@ -133,7 +133,7 @@ class MiniGreenhouse(gym.Env):
         
         # No matter if the flag_run_dnn True or not we still need to load the files for the offline training
         # Load the datasets from separate files for the DNN model
-        if is_mature == True:
+        if is_mature == True and self.flag_run == True:
             print("IS MATURE - TRUE, USING MATURE CROPS DATASETS")
             file_path = r"C:\Users\frm19\OneDrive - Wageningen University & Research\2. Thesis - Information Technology\3. Software Projects\mini-greenhouse-greenlight-model\Code\inputs\Mini Greenhouse\september-iot-datasets-test-mature-crops.xlsx"
         else:

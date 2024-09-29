@@ -63,7 +63,7 @@ except Exception as e:
     raise RuntimeError(f"Failed to build the PPO algorithm: {e}")
 
 # Train the algorithm
-for episode in tqdm(range(2700)):  # Train for 2700 episodes or around 70 days in real-time
+for episode in tqdm(range(2700)):  # Train for 2700 episodes or around 76 days in real-time
     result = algo.train()  # Perform training
     if episode % 20 == 0:
         # Save a checkpoint every 20 episodes 

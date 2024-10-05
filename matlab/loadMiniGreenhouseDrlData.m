@@ -1,8 +1,9 @@
 function [outdoor, controls, startTime] = loadMiniGreenhouseDrlData(firstDay, seasonLength, is_mature)
-% loadMiniGreenhouseData2 Get data from real mini-greenhouse experiments
-% The following datasets are available:
-% - 
-% - 
+% loadMiniGreenhouseDrlData Get data from real mini-greenhouse experiments
+%
+% Efraim Manurung, Information Technology Group
+% Wageningen University
+% efraim.manurung@gmail.com
 % The data is given in 5-minute intervals.
 % Based on:
 % David Katzin, Simon van Mourik, Frank Kempkes, and Eldert J. Van Henten. 2020. 
@@ -28,7 +29,6 @@ function [outdoor, controls, startTime] = loadMiniGreenhouseDrlData(firstDay, se
 % 13        Leaf temperature                    °C
 %
 % Inputs: 
-% REMEMBER THAT it using Dataset6 for now
 %   firstDay       Where to start looking at the data 
 %                       (days since start of the season, fractions accepted)
 %                       The start of the season is always start at 24:00:00 
@@ -72,32 +72,40 @@ function [outdoor, controls, startTime] = loadMiniGreenhouseDrlData(firstDay, se
         currentFile = mfilename('fullpath');
         currentFolder = fileparts(currentFile);
         
+        % %% September datasets test
+        % path = [currentFolder '\septemberiotdatasetstestmaturecrops.mat'];
+        % 
+        % % load hi res 
+        % minigreenhouse = load(path).septemberiotdatasetstestmaturecrops;
+        % 
+        % disp('MATLAB LOAD DATA from septemberiotdatasetstestmaturecrops.mat');
+
         %% September datasets test
-        path = [currentFolder '\septemberiotdatasetstestmaturecrops.mat'];
+        path = [currentFolder '\octoberiotdatasetstestmaturecrops.mat'];  
         
         % load hi res 
-        minigreenhouse = load(path).septemberiotdatasetstestmaturecrops;
+        minigreenhouse = load(path).octoberiotdatasetstestmaturecrops;
 
-        disp('MATLAB LOAD DATA from septemberiotdatasetstestmaturecrops.mat');
+        disp('MATLAB LOAD DATA from octoberiotdatasetstestmaturecrops.mat');
     else
         currentFile = mfilename('fullpath');
         currentFolder = fileparts(currentFile);
         
         %% June datasets test
-        path = [currentFolder '\juneiotdatasetstestsmallcrops.mat'];
-
-        % load hi res 
-        minigreenhouse = load(path).juneiotdatasetstestsmallcrops;
-
-        disp('MATLAB LOAD DATA from juneiotdatasetstestsmallcrops.mat')
-
-        %% August datasets test
-        % path = [currentFolder '\augustiotdatasetstestsmallcrops.mat'];
+        % path = [currentFolder '\juneiotdatasetstestsmallcrops.mat'];
         % 
         % % load hi res 
-        % minigreenhouse = load(path).augustiotdatasetstestsmallcrops;
+        % minigreenhouse = load(path).juneiotdatasetstestsmallcrops;
         % 
-        % disp('MATLAB LOAD DATA from augustiotdatasetstestsmallcrops.mat')
+        % disp('MATLAB LOAD DATA from juneiotdatasetstestsmallcrops.mat')
+
+        %% August datasets test
+        path = [currentFolder '\augustiotdatasetstestsmallcrops.mat'];
+
+        % load hi res 
+        minigreenhouse = load(path).augustiotdatasetstestsmallcrops;
+
+        disp('MATLAB LOAD DATA from augustiotdatasetstestsmallcrops.mat')
 
         %% iotdatasets to train the DRL model, start with small crops
         % path = [currentFolder '\iotdatasetstraindrl.mat'];

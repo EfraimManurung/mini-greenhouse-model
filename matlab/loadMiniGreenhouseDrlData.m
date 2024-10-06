@@ -80,7 +80,7 @@ function [outdoor, controls, startTime] = loadMiniGreenhouseDrlData(firstDay, se
         % 
         % disp('MATLAB LOAD DATA from septemberiotdatasetstestmaturecrops.mat');
 
-        %% September datasets test
+        %% October datasets test
         path = [currentFolder '\octoberiotdatasetstestmaturecrops.mat'];  
         
         % load hi res 

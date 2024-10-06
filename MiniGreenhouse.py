@@ -180,6 +180,26 @@ class MiniGreenhouse(gym.Env):
 
                 # Run the script with the updated outdoor measurements for the first time
                 self.run_matlab_script('outdoor-indoor.mat', None, None)
+                
+                # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
+                time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+                ventilation = self.ventilation[-4:]
+                toplights = self.toplights[-4:]
+                heater = self.heater[-4:]
+                                        
+                print("CONVERTED ACTION")
+                print("ventilation: ", ventilation)
+                print("toplights: ", toplights)
+                print("heater: ", heater)
+
+                # Format data controls in JSON format
+                json_data = self.service_functions.format_data_in_JSON(time_steps, \
+                                                    ventilation, toplights, \
+                                                    heater)
+                
+                # Publish controls to the raspberry pi (IoT system client)
+                self.service_functions.publish_mqtt_data(json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls")
+
             else:
                 # Run the script with empty parameter
                 self.run_matlab_script()
@@ -815,7 +835,7 @@ class MiniGreenhouse(gym.Env):
         print("toplights: ", toplights)
         print("heater: ", heater)
 
-        # Keep only the latest 3 data points before appending
+        # Keep only the latest 4 data points before appending
         # Append controls to the lists
         self.ventilation_list.extend(ventilation[-4:])
         self.toplights_list.extend(toplights[-4:])

@@ -7,25 +7,23 @@ MSc Thesis in Information Technology Group, Wageningen University
 
 efraim.manurung@gmail.com
 
-Table 1 Meaning of the state x(t), x'(t), real measurement y(t), prediction measurement ŷ(t), 
-control signal u(t), and disturbance d(t).
----------------------------------------------------------------------------------------------------------
-x1(t), x'1(t)  Indoor CO2 [ppm]                       y1(t)  Indoor CO2 [ppm]
-x2(t), x'2(t)  Indoor temperature [°C]                y2(t)  Indoor temperature [°C]
-x3(t), x'3(t)  Indoor humidity [%]                    y3(t)  Indoor humidity [%]
-x4(t), x'4(t)  PAR Inside [W/m²]                      y4(t)  PAR Inside [W/m²]
-x5(t), x'5(t)  Fruit Dry-weight [m²/m²]               y5(t)  Leaf Temperature [°C]
-x6(t), x'6(t)  Crop Development Stage [°C day]        ŷ(t)  Prediction from calibration model
-x7(t), x'7(t)  Leaf Temperature [°C]
----------------------------------------------------------------------------------------------------------
-d1(t)  Outside Radiation [W/m²]                       u1(t)  Fan [-]
-d2(t)  Outdoor CO2 [ppm]                              u2(t)  Toplighting status [-]
-d3(t)  Outdoor temperature [°C]                       u3(t)  Heating [-]
+Table - General structure of the attributes, the predicted state variables of DNN x(t) and GreenLight x'(t), 
+real measurement from the sensors ŷ(t), combined predicted measurement from LSTM \(\hat{y}(t)\), actuators control signal 
+u(t) and disturbance d(t).
+-------------------------------------------------------------------------------------------------------------------
+x1(t), x'1(t)  Indoor CO2 [ppm]             y1(t)  Indoor CO2 [ppm]                 ŷ1(t)  Indoor CO2 [ppm] 
+x2(t), x'2(t)  Indoor temperature [°C]      y2(t)  Indoor temperature [°C]          ŷ2(t)  Indoor temperature [°C]
+x3(t), x'3(t)  Indoor humidity [%]          y3(t)  Indoor humidity [%]              ŷ3(t)  Indoor humidity [%]   
+x4(t), x'4(t)  PAR Inside [W/m²]            y4(t)  PAR Inside [W/m²]                ŷ4(t)  PAR Inside [W/m²]
+x7(t), x'7(t)  Leaf Temperature [°C]        y5(t)  Leaf Temperature [°C]            ŷ5(t)  Leaf Temperature [°C]
+-------------------------------------------------------------------------------------------------------------------
+d1(t)  Outside Radiation [W/m²]             u1(t)  Fan [0/1] (1 is on)
+d2(t)  Outdoor CO2 [ppm]                    u2(t)  Toplighting status [0/1] (1 is on)
+d3(t)  Outdoor temperature [°C]             u3(t)  Heating [0/1] (1 is on)
 d4(t)  Outdoor humidity [%]
----------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------
 
-based on Table 1, we want to predict the state variable x(t) except the crop development stage 
-with control signal u(t) and disturbance d(t)
+based on Table above, we want to predict the state variable x(t) with control signal u(t) and disturbance d(t)
  
 Project sources:
     - https://github.com/davkat1/GreenLight
@@ -148,12 +146,7 @@ class MiniGreenhouse(gym.Env):
                 
         # Load the dataset
         self.mgh_data = pd.read_excel(file_path)
-                
-        # Initialize lists to store control values
-        self.ventilation_list = []
-        self.toplights_list = []
-        self.heater_list = []
-        
+                        
         # Initialize a list to store rewards
         self.rewards_list = []
         
@@ -177,33 +170,13 @@ class MiniGreenhouse(gym.Env):
             
             # Call the MATLAB function 
             if self.online_measurements == True:
-
+                
                 # Run the script with the updated outdoor measurements for the first time
                 self.run_matlab_script('outdoor-indoor.mat', None, None)
-                
-                # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
-                time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-                ventilation = self.ventilation[-4:]
-                toplights = self.toplights[-4:]
-                heater = self.heater[-4:]
-                                        
-                print("CONVERTED ACTION")
-                print("ventilation: ", ventilation)
-                print("toplights: ", toplights)
-                print("heater: ", heater)
-
-                # Format data controls in JSON format
-                json_data = self.service_functions.format_data_in_JSON(time_steps, \
-                                                    ventilation, toplights, \
-                                                    heater)
-                
-                # Publish controls to the raspberry pi (IoT system client)
-                self.service_functions.publish_mqtt_data(json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls")
-
             else:
+                                
                 # Run the script with empty parameter
                 self.run_matlab_script()
-        
         else:
             print(f"MATLAB script not found: {self.matlab_script_path}")
 
@@ -292,10 +265,6 @@ class MiniGreenhouse(gym.Env):
             'heater': np.zeros(4).reshape(-1, 1)
         }
         
-        # Append only the latest 3 values from each control variable 
-        self.ventilation_list.extend(self.controls['ventilation'].flatten()[-4:])
-        self.toplights_list.extend(self.controls['toplights'].flatten()[-4:])
-        self.heater_list.extend(self.controls['heater'].flatten()[-4:])
         sio.savemat('controls.mat', self.controls)
         
     def run_matlab_script(self, outdoor_file = None, indoor_file=None, fruit_file=None):
@@ -323,40 +292,6 @@ class MiniGreenhouse(gym.Env):
 
         if self.online_measurements == True:
             print("load_excel_or_mqtt_data from ONLINE MEASUREMENTS")
-            
-            # Initialize outdoor measurements, to get the outdoor measurements
-            outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements(broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements")
-            
-            # Convert outdoor_indoor_measurements to a DataFrame
-            self.step_data = pd.DataFrame({
-                'time': outdoor_indoor_measurements['time'].flatten(),
-                'global out': outdoor_indoor_measurements['par_out'].flatten(),
-                'global in': outdoor_indoor_measurements['par_in'].flatten(),
-                'temp out': outdoor_indoor_measurements['temp_out'].flatten(),
-                'temp in': outdoor_indoor_measurements['temp_in'].flatten(),
-                'rh out': outdoor_indoor_measurements['hum_out'].flatten(),
-                'rh in': outdoor_indoor_measurements['hum_in'].flatten(),
-                'co2 out': outdoor_indoor_measurements['co2_out'].flatten(),
-                'co2 in': outdoor_indoor_measurements['co2_in'].flatten(),
-                'leaf temp': outdoor_indoor_measurements['leaf_temp'].flatten()
-            })
-            
-            # Add empty columns for toplights, ventilation, and heater
-            self.step_data['toplights'] = np.nan       # or None
-            self.step_data['ventilation'] = np.nan     # or None
-            self.step_data['heater'] = np.nan          # or None
-            
-            # Map the outdoor measurements to the corresponding variables
-            new_time_excel_mqtt = outdoor_indoor_measurements['time'].flatten()
-            new_global_out_excel_mqtt = outdoor_indoor_measurements['par_out'].flatten()
-            new_global_in_excel_mqtt = outdoor_indoor_measurements['par_in'].flatten()  
-            new_temp_out_excel_mqtt = outdoor_indoor_measurements['temp_out'].flatten()  
-            new_temp_in_excel_mqtt = outdoor_indoor_measurements['temp_in'].flatten()
-            new_rh_out_excel_mqtt = outdoor_indoor_measurements['hum_out'].flatten()  
-            new_rh_in_excel_mqtt = outdoor_indoor_measurements['hum_in'].flatten()
-            new_co2_out_excel_mqtt = outdoor_indoor_measurements['co2_out'].flatten()  
-            new_co2_in_excel_mqtt = outdoor_indoor_measurements['co2_in'].flatten()
-            new_leaf_temp_excel_mqtt = outdoor_indoor_measurements['leaf_temp'].flatten()
             
             if self.action_from_drl == True and _action_drl is not None:
                 # Use the actions from the DRL model and convert actions to discrete values
@@ -393,7 +328,64 @@ class MiniGreenhouse(gym.Env):
                 new_toplights = self.step_data['toplights'].values
                 new_ventilation = self.step_data['ventilation'].values
                 new_heater = self.step_data['heater'].values
+            
+            '''TO-DO: Server send the actions with all zero as the initializiation'''
+            # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = self.ventilation[-4:]
+            toplights = self.toplights[-4:]
+            heater = self.heater[-4:]
+                                    
+            print("CONVERTED ACTION REAL-TIME MEASUREMENTS")
+            print("ventilation: ", ventilation)
+            print("toplights: ", toplights)
+            print("heater: ", heater)
 
+            # Format data controls in JSON format
+            json_data = self.service_functions.format_data_in_JSON(time_steps, \
+                                                ventilation, toplights, \
+                                                heater)
+            
+            # Publish controls to the raspberry pi (IoT system client)
+            self.service_functions.publish_mqtt_data(json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls")
+
+            '''TO-DO: The firmware or client or raspberry pi run the command for 20 minutes, then send again the data.
+               So, the server can process the receive data and determine the action again.
+            '''
+            # Initialize outdoor measurements, to get the outdoor measurements
+            outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements(broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements")
+            
+            # Convert outdoor_indoor_measurements to a DataFrame
+            self.step_data = pd.DataFrame({
+                'time': outdoor_indoor_measurements['time'].flatten(),
+                'global out': outdoor_indoor_measurements['par_out'].flatten(),
+                'global in': outdoor_indoor_measurements['par_in'].flatten(),
+                'temp out': outdoor_indoor_measurements['temp_out'].flatten(),
+                'temp in': outdoor_indoor_measurements['temp_in'].flatten(),
+                'rh out': outdoor_indoor_measurements['hum_out'].flatten(),
+                'rh in': outdoor_indoor_measurements['hum_in'].flatten(),
+                'co2 out': outdoor_indoor_measurements['co2_out'].flatten(),
+                'co2 in': outdoor_indoor_measurements['co2_in'].flatten(),
+                'leaf temp': outdoor_indoor_measurements['leaf_temp'].flatten()
+            })
+            
+            # Add empty columns for toplights, ventilation, and heater
+            self.step_data['toplights'] = np.nan       # or None
+            self.step_data['ventilation'] = np.nan     # or None
+            self.step_data['heater'] = np.nan          # or None
+            
+            # Map the outdoor measurements to the corresponding variables
+            new_time_excel_mqtt = outdoor_indoor_measurements['time'].flatten()
+            new_global_out_excel_mqtt = outdoor_indoor_measurements['par_out'].flatten()
+            new_global_in_excel_mqtt = outdoor_indoor_measurements['par_in'].flatten()  
+            new_temp_out_excel_mqtt = outdoor_indoor_measurements['temp_out'].flatten()  
+            new_temp_in_excel_mqtt = outdoor_indoor_measurements['temp_in'].flatten()
+            new_rh_out_excel_mqtt = outdoor_indoor_measurements['hum_out'].flatten()  
+            new_rh_in_excel_mqtt = outdoor_indoor_measurements['hum_in'].flatten()
+            new_co2_out_excel_mqtt = outdoor_indoor_measurements['co2_out'].flatten()  
+            new_co2_in_excel_mqtt = outdoor_indoor_measurements['co2_in'].flatten()
+            new_leaf_temp_excel_mqtt = outdoor_indoor_measurements['leaf_temp'].flatten()
+            
             # Check if instance variables already exist; if not, initialize them
             if not hasattr(self, 'time_excel_mqtt'):
                 self.time_excel_mqtt = new_time_excel_mqtt
@@ -424,6 +416,25 @@ class MiniGreenhouse(gym.Env):
                 self.toplights = np.concatenate((self.toplights, new_toplights))
                 self.ventilation = np.concatenate((self.ventilation, new_ventilation))
                 self.heater = np.concatenate((self.heater, new_heater))
+            
+            '''TO-DO: Get the newest data from the online measurements and save it as outdoor-indoor.mat'''
+            if self.flag_run_gl == True:
+            
+                print("USE OUTDOOR ONLINE MEASUREMENTS")
+
+                # Update the MATLAB environment with the 4 latest data                
+                # In the MATLAB, need to follow this format
+                # outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];
+                outdoor_indoor = {
+                    'time': self.time_excel_mqtt[-4:].astype(float).reshape(-1, 1),
+                    'par_out': self.global_out_excel_mqtt[-4:].astype(float).reshape(-1, 1),
+                    'temp_out': self.temp_out_excel_mqtt[-4:].astype(float).reshape(-1, 1),
+                    'hum_out': self.rh_out_excel_mqtt[-4:].astype(float).reshape(-1, 1),
+                    'co2_out': self.co2_out_excel_mqtt[-4:].astype(float).reshape(-1, 1)
+                }
+            
+                # Save control variables to .mat file
+                sio.savemat('outdoor-indoor.mat', outdoor_indoor)
         
             # Optionally: Check or print the step_data structure to ensure it's correct
             print("Step Data (online):", self.step_data.head())
@@ -431,21 +442,9 @@ class MiniGreenhouse(gym.Env):
         elif self.online_measurements == False:
             # Use offline dataset 
             print("load_excel_or_mqtt_data from OFFLINE MEASUREMENTS")
-        
+            
             # Slice the dataframe to get the rows for the current step
             self.step_data = self.mgh_data.iloc[self.season_length_dnn:self.season_length_dnn + 4]
-
-            # Extract the required columns and flatten them
-            new_time_excel_mqtt = self.step_data['time'].values
-            new_global_out_excel_mqtt = self.step_data['global out'].values
-            new_global_in_excel_mqtt = self.step_data['global in'].values
-            new_temp_in_excel_mqtt = self.step_data['temp in'].values
-            new_temp_out_excel_mqtt = self.step_data['temp out'].values
-            new_rh_in_excel_mqtt = self.step_data['rh in'].values
-            new_rh_out_excel_mqtt = self.step_data['rh out'].values
-            new_co2_in_excel_mqtt = self.step_data['co2 in'].values
-            new_co2_out_excel_mqtt = self.step_data['co2 out'].values
-            new_leaf_temp_excel_mqtt = self.step_data['leaf temp'].values
             
             if self.action_from_drl == True and _action_drl is not None:
                 # Use the actions from the DRL model
@@ -473,7 +472,19 @@ class MiniGreenhouse(gym.Env):
                 new_toplights = self.step_data['toplights'].values
                 new_ventilation = self.step_data['ventilation'].values
                 new_heater = self.step_data['heater'].values
-
+            
+            # Extract the required columns and flatten them
+            new_time_excel_mqtt = self.step_data['time'].values
+            new_global_out_excel_mqtt = self.step_data['global out'].values
+            new_global_in_excel_mqtt = self.step_data['global in'].values
+            new_temp_in_excel_mqtt = self.step_data['temp in'].values
+            new_temp_out_excel_mqtt = self.step_data['temp out'].values
+            new_rh_in_excel_mqtt = self.step_data['rh in'].values
+            new_rh_out_excel_mqtt = self.step_data['rh out'].values
+            new_co2_in_excel_mqtt = self.step_data['co2 in'].values
+            new_co2_out_excel_mqtt = self.step_data['co2 out'].values
+            new_leaf_temp_excel_mqtt = self.step_data['leaf temp'].values
+            
             # Check if instance variables already exist; if not, initialize them
             if not hasattr(self, 'time_excel_mqtt'):
                 self.time_excel_mqtt = new_time_excel_mqtt
@@ -505,6 +516,17 @@ class MiniGreenhouse(gym.Env):
                 self.ventilation = np.concatenate((self.ventilation, new_ventilation))
                 self.heater = np.concatenate((self.heater, new_heater))
 
+            # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = self.ventilation[-4:]
+            toplights = self.toplights[-4:]
+            heater = self.heater[-4:]
+                                    
+            print("CONVERTED ACTION OFFLINE")
+            print("ventilation: ", ventilation)
+            print("toplights: ", toplights)
+            print("heater: ", heater)
+            
             # Debugging
             print("Step Data (offline):", self.step_data.head())
     
@@ -822,6 +844,8 @@ class MiniGreenhouse(gym.Env):
         
         # Load the updated data from the excel or from mqtt, for online or offline measurements, we still need to call the data
         # Get the oudoor measurements
+        '''TO-DO: The firmware or client or raspberry pi run the command for 20 minutes with the determined actions 
+           from the DRL algorithm then send again the data'''
         self.load_excel_or_mqtt_data(_action_drl)
         
         # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
@@ -830,27 +854,6 @@ class MiniGreenhouse(gym.Env):
         toplights = self.toplights[-4:]
         heater = self.heater[-4:]
                                  
-        print("CONVERTED ACTION")
-        print("ventilation: ", ventilation)
-        print("toplights: ", toplights)
-        print("heater: ", heater)
-
-        # Keep only the latest 4 data points before appending
-        # Append controls to the lists
-        self.ventilation_list.extend(ventilation[-4:])
-        self.toplights_list.extend(toplights[-4:])
-        self.heater_list.extend(heater[-4:])
-        
-        # Only publish MQTT data for the Raspberry Pi when running not training
-        if self.online_measurements == True:
-            # Format data controls in JSON format
-            json_data = self.service_functions.format_data_in_JSON(time_steps, \
-                                                ventilation, toplights, \
-                                                heater)
-            
-            # Publish controls to the raspberry pi (IoT system client)
-            self.service_functions.publish_mqtt_data(json_data, broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/drl-controls")
-
         # Create control dictionary
         controls = {
             'time': time_steps.reshape(-1, 1),
@@ -931,7 +934,7 @@ class MiniGreenhouse(gym.Env):
             self.predicted_combined_models(time_steps_formatted)
             
         # Calculate reward
-        # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the is the same)
+        # Remember that the actions become a list, but we only need the first actions from 15 minutes (all of the list of actions is the same)
         _reward = self.get_reward(ventilation[0], toplights[0], heater[0])
         
         # Record the reward
@@ -973,9 +976,9 @@ class MiniGreenhouse(gym.Env):
         print("\n\n-------------------------------------------------------------------------------------")
         print("Print all the appended data.")
         print(f"Length of Time: {len(self.time_excel_mqtt)}")
-        print(f"Length of Action Ventilation: {len(self.ventilation_list)}")
-        print(f"Length of Action Toplights: {len(self.toplights_list)}")
-        print(f"Length of Action Heater: {len(self.heater_list)}")
+        print(f"Length of Action Ventilation: {len(self.ventilation)}")
+        print(f"Length of Action Toplights: {len(self.toplights)}")
+        print(f"Length of Action Heater: {len(self.heater)}")
         print(f"Length of reward: {len(self.rewards_list)}")
         print(f"Length of CO2 In (Actual): {len(self.co2_in_excel_mqtt)}")
         print(f"Length of Temperature In (Actual): {len(self.temp_in_excel_mqtt)}")
@@ -1003,7 +1006,7 @@ class MiniGreenhouse(gym.Env):
                 
                 # Save all the data (included the actions) in an Excel file                
                 self.service_functions.export_to_excel(
-                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    file_name, self.time_combined_models, self.ventilation, self.toplights, self.heater, self.rewards,
                     None, None, None, None, None,
                     self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
@@ -1023,8 +1026,8 @@ class MiniGreenhouse(gym.Env):
                     None, None, None)
                 
                 # Plot the actions
-                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
-                                                            self.heater_list)
+                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation, self.toplights, 
+                                                            self.heater)
                         
             else:
                 print("---------------------------------------------------------------")
@@ -1035,7 +1038,7 @@ class MiniGreenhouse(gym.Env):
 
                 # Save all the data in an Excel file
                 self.service_functions.export_to_excel(
-                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    file_name, self.time_combined_models, self.ventilation, self.toplights, self.heater, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
                     self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
@@ -1066,8 +1069,8 @@ class MiniGreenhouse(gym.Env):
                     metrics_dnn, metrics_gl, metrics_combined)
                 
                 # Plot the actions
-                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
-                                                            self.heater_list)
+                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation, self.toplights, 
+                                                            self.heater)
                 
                 # Plot the rewards
                 # self.service_functions.plot_rewards('output/rewars-graphs.png', self.time_combined_models, self.rewards_list)
@@ -1082,7 +1085,7 @@ class MiniGreenhouse(gym.Env):
                 
                 # Save all the data (included the actions) in an Excel file
                 self.service_functions.export_to_excel(
-                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    file_name, self.time_combined_models, self.ventilation, self.toplights, self.heater, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
                     self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
@@ -1102,8 +1105,8 @@ class MiniGreenhouse(gym.Env):
                     None, None, None)
                 
                 # Plot the actions
-                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
-                                                            self.heater_list)
+                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation, self.toplights, 
+                                                            self.heater)
             
             # Run with scheduled actions
             else:
@@ -1112,7 +1115,7 @@ class MiniGreenhouse(gym.Env):
                 
                 # Save all the data in an Excel file                
                 self.service_functions.export_to_excel(
-                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    file_name, self.time_combined_models, self.ventilation, self.toplights, self.heater, self.rewards_list,
                     self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
                     self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
                     self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
@@ -1137,8 +1140,8 @@ class MiniGreenhouse(gym.Env):
                 )
                 
                 # Plot the actions
-                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation_list, self.toplights_list, 
-                                                            self.heater_list)
+                self.service_functions.plot_actions('output/output_actions.png', self.time_combined_models, self.ventilation, self.toplights, 
+                                                            self.heater)
                 
     def evaluate_predictions(self):
         '''

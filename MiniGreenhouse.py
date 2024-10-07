@@ -160,7 +160,7 @@ class MiniGreenhouse(gym.Env):
         self.service_functions = ServiceFunctions()
         
         # Load the updated data from the excel or from mqtt 
-        self.excel_or_mqtt_data(None)
+        self.load_excel_or_mqtt_data(None)
         
         # Check if MATLAB script exists
         if os.path.isfile(self.matlab_script_path):

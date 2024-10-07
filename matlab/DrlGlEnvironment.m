@@ -39,9 +39,11 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     
     % Check if the outdoofile empty or not
     if isempty(outdoorFile)
-        %disp('USED OFFLINE DATASET.');
+        disp('OUTDOOR FILE IS EMPTY! USED OFFLINE DATASET')
     % Try to load outdoor measurements from the .mat file
-    else
+    else    
+            disp('OUTDOOR FILE IS NOT EMPTY! USED ONLINE DATASET')
+
             %Load outdoor measurements from the .mat file
             outdoor_file = load(outdoorFile);
             outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];
@@ -77,8 +79,9 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
 
     if isempty(indoorFile)
         drl_indoor = [];
-        disp('INDOOR FILE EMPTY!! FOR DEBUGING')
+        disp('INDOOR FILE EMPTY! USED OFFLINE DATASET')
     else
+        disp('INDOOR FILE IS NOT EMPTY! USED ONLINE DATASET')
         % Load indoor measurements from the .mat file
         indoor_file = load(indoorFile);
         drl_indoor = [indoor_file.time, indoor_file.temp_in, indoor_file.rh_in, indoor_file.co2_in];

@@ -39,36 +39,32 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     
     % Check if the outdoofile empty or not
     if isempty(outdoorFile)
-        disp('OUTDOOR FILE IS EMPTY! USED OFFLINE DATASET')
-    % Try to load outdoor measurements from the .mat file
+        % Try to load outdoor measurements from the .mat file
     else    
-            disp('OUTDOOR FILE IS NOT EMPTY! USED ONLINE DATASET')
-
-            %Load outdoor measurements from the .mat file
-            outdoor_file = load(outdoorFile);
-            outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];
-        
-            % Function inputs:
-            %   lampType        Type of lamps in the greenhouse. Choose between 
-            %                   'hps', 'led', or 'none' (default is none)
-            %   weather         A matrix with 8 columns, in the following format:
-            %       weather(:,1)    timestamps of the input [s] in regular intervals
-            %       weather(:,2)    radiation     [W m^{-2}]  outdoor global irradiation 
-            %       weather(:,3)    temperature   [°C]        outdoor air temperature
-            %       weather(:,4)    humidity      [kg m^{-3}] outdoor vapor concentration
-            %       weather(:,5)    co2 [kg{CO2} m^{-3}{air}] outdoor CO2 concentration
-            %       weather(:,6)    wind        [m s^{-1}] outdoor wind speed
-            %       weather(:,7)    sky temperature [°C]
-            %       weather(:,8)    temperature of external soil layer [°C]
-            %       weather(:,9)    daily radiation sum [MJ m^{-2} day^{-1}]
-        
-            % Change for outdoor measurements
-            % outdoor_iot(:,2) = outdoor_drl(:,2) * 0.0079;   % radiation     [W m^{-2}]  outdoor global irradiation source: https://www.researchgate.net/post/Howto_convert_solar_intensity_in_LUX_to_watt_per_meter_square_for_sunlight#:~:text=The%20LUX%20meter%20is%20used,of%20the%20incident%20solar%20radiation.&text=multiply%20lux%20to%200.0079%20which%20give%20you%20value%20of%20w%2Fm2.
-            outdoor_iot(:,2) = outdoor_drl(:,2);
-            outdoor_iot(:,3) = outdoor_drl(:,3);            % temperature   [°C]        outdoor air temperature
-            outdoor_iot(:,4) = rh2vaporDens(double(outdoor_iot(:,3)), double(outdoor_drl(:,4)));  % Convert relative humidity [%] to vapor density [kg{H2O} m^{-3}]
-            outdoor_iot(:,5) = co2ppm2dens(double(outdoor_iot(:,3)), double(outdoor_drl(:,5))); %co2 [kg{CO2} m^{-3}{air}] outdoor CO2 concentration
-
+        %Load outdoor measurements from the .mat file
+        outdoor_file = load(outdoorFile);
+        outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];
+    
+        % Function inputs:
+        %   lampType        Type of lamps in the greenhouse. Choose between 
+        %                   'hps', 'led', or 'none' (default is none)
+        %   weather         A matrix with 8 columns, in the following format:
+        %       weather(:,1)    timestamps of the input [s] in regular intervals
+        %       weather(:,2)    radiation     [W m^{-2}]  outdoor global irradiation 
+        %       weather(:,3)    temperature   [°C]        outdoor air temperature
+        %       weather(:,4)    humidity      [kg m^{-3}] outdoor vapor concentration
+        %       weather(:,5)    co2 [kg{CO2} m^{-3}{air}] outdoor CO2 concentration
+        %       weather(:,6)    wind        [m s^{-1}] outdoor wind speed
+        %       weather(:,7)    sky temperature [°C]
+        %       weather(:,8)    temperature of external soil layer [°C]
+        %       weather(:,9)    daily radiation sum [MJ m^{-2} day^{-1}]
+    
+        % Change for outdoor measurements
+        % outdoor_iot(:,2) = outdoor_drl(:,2) * 0.0079;   % radiation     [W m^{-2}]  outdoor global irradiation source: https://www.researchgate.net/post/Howto_convert_solar_intensity_in_LUX_to_watt_per_meter_square_for_sunlight#:~:text=The%20LUX%20meter%20is%20used,of%20the%20incident%20solar%20radiation.&text=multiply%20lux%20to%200.0079%20which%20give%20you%20value%20of%20w%2Fm2.
+        outdoor_iot(:,2) = outdoor_drl(:,2);
+        outdoor_iot(:,3) = outdoor_drl(:,3);            % temperature   [°C]        outdoor air temperature
+        outdoor_iot(:,4) = rh2vaporDens(double(outdoor_iot(:,3)), double(outdoor_drl(:,4)));  % Convert relative humidity [%] to vapor density [kg{H2O} m^{-3}]
+        outdoor_iot(:,5) = co2ppm2dens(double(outdoor_iot(:,3)), double(outdoor_drl(:,5))); %co2 [kg{CO2} m^{-3}{air}] outdoor CO2 concentration
     end
 
     % number of seconds since beginning of year to startTime
@@ -79,9 +75,7 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
 
     if isempty(indoorFile)
         drl_indoor = [];
-        disp('INDOOR FILE EMPTY! USED OFFLINE DATASET')
     else
-        disp('INDOOR FILE IS NOT EMPTY! USED ONLINE DATASET')
         % Load indoor measurements from the .mat file
         indoor_file = load(indoorFile);
         drl_indoor = [indoor_file.time, indoor_file.temp_in, indoor_file.rh_in, indoor_file.co2_in];

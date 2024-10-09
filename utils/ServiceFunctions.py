@@ -238,7 +238,7 @@ class ServiceFunctions:
         plt.show()
         
         # Save the plot to a file
-        fig.savefig(filename, dpi=1000)
+        fig.savefig(filename, dpi=500)
     
     def plot_leaf_temperature(self, filename, time, leaf_temp_actual, leaf_temp_predicted_dnn, leaf_temp_predicted_gl, leaf_temp_combined=None,
                             metrics_dnn=None, metrics_gl=None, metrics_combined=None):
@@ -298,7 +298,7 @@ class ServiceFunctions:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename, dpi=1000)
+        fig.savefig(filename, dpi=500)
 
     def export_to_excel(self, filename, time, ventilation_list, toplights_list, heater_list, reward_list,
                         co2_actual=None, temp_actual=None, rh_actual=None, par_actual=None, leaf_temp_actual=None,
@@ -444,7 +444,7 @@ class ServiceFunctions:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename, dpi=1000)
+        fig.savefig(filename, dpi=500)
     
     def plot_rewards(self, filename, time, rewards_list):
         '''
@@ -485,7 +485,7 @@ class ServiceFunctions:
         plt.show()
 
         # Save the plot to a file
-        fig.savefig(filename, dpi=1000)
+        fig.savefig(filename, dpi=500)
     
     def export_rewards_to_excel(self, filename, time, rewards_list):
         '''

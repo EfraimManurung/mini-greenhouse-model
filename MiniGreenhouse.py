@@ -299,7 +299,7 @@ class MiniGreenhouse(gym.Env):
         '''
 
         if self.online_measurements == True:
-            print("load_excel_or_mqtt_data from ONLINE MEASUREMENTS")
+            print("LOAD DATA FROM ONLINE MEASUREMENTS")
             
             # Initialize outdoor measurements, to get the outdoor measurements
             outdoor_indoor_measurements = self.service_functions.get_outdoor_indoor_measurements(broker="192.168.1.56", port=1883, topic="greenhouse-iot-system/outdoor-indoor-measurements")
@@ -407,7 +407,7 @@ class MiniGreenhouse(gym.Env):
         
         elif self.online_measurements == False:
             # Use offline dataset 
-            print("load_excel_or_mqtt_data from OFFLINE MEASUREMENTS")
+            print("LOAD DATA FROM OFFLINE DATASETS")
         
             # Slice the dataframe to get the rows for the current step
             self.step_data = self.mgh_data.iloc[self.season_length_dnn:self.season_length_dnn + 4]
@@ -792,34 +792,48 @@ class MiniGreenhouse(gym.Env):
         
         # Increment the current step
         self.current_step += 1
-        print("")
-        print("")
-        print("----------------------------------")
+
+        print("\n\n----------------------------------------------------------------------------------------")
         print("CURRENT STEPS: ", self.current_step)
+        print("----------------------------------------------------------------------------------------")
         
         if self.online_measurements == False:
             # Get the oudoor measurements
             self.load_excel_or_mqtt_data(_action_drl)
         
-        # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline measurement
-        time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
-        ventilation = self.ventilation[-4:]
-        toplights = self.toplights[-4:]
-        heater = self.heater[-4:]
-                                 
-        print("CONVERTED ACTION")
-        print("ventilation: ", ventilation)
-        print("toplights: ", toplights)
-        print("heater: ", heater)
-
-        # Keep only the latest 3 data points before appending
-        # Append controls to the lists
-        self.ventilation_list.extend(ventilation[-4:])
-        self.toplights_list.extend(toplights[-4:])
-        self.heater_list.extend(heater[-4:])
+            # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline datasets
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = self.ventilation[-4:]
+            toplights = self.toplights[-4:]
+            heater = self.heater[-4:]
+                                    
+            # Keep only the latest 3 data points before appending
+            # Append controls to the lists
+            self.ventilation_list.extend(ventilation[-4:])
+            self.toplights_list.extend(toplights[-4:])
+            self.heater_list.extend(heater[-4:])
+            
+            # Get the action from the offline datasets           
+            print("ACTION SIGNAL u(t)")
+            print("ventilation: ", ventilation)
+            print("toplights: ", toplights)
+            print("heater: ", heater)
         
         # Only publish MQTT data for the Raspberry Pi when running not training
         if self.online_measurements == True:
+            # Get the action from the DRL model 
+            # print("RAW ACTION: ", _action_drl)
+            
+            # Convert actions to discrete values
+            ventilation = 1 if _action_drl[0] >= 0.5 else 0
+            toplights = 1 if _action_drl[1] >= 0.5 else 0
+            heater = 1 if _action_drl[2] >= 0.5 else 0
+            
+            print("ACTION SIGNAL u(t)")
+            print("ventilation: ", ventilation)
+            print("toplights: ", toplights)
+            print("heater: ", heater)
+            
             # Format data controls in JSON format
             json_data = self.service_functions.format_data_in_JSON(time_steps, \
                                                 ventilation, toplights, \
@@ -850,7 +864,7 @@ class MiniGreenhouse(gym.Env):
 
         if self.flag_run_gl == True:
             
-            print("USE INDOOR GREENLIGHT")
+            # print("USE INDOOR GREENLIGHT")
             # Use the data from the GreenLight model
             # Convert co2_in ppm using service functions
             co2_density_gl = self.service_functions.co2ppm_to_dens(self.temp_in_predicted_gl[-4:], self.co2_in_predicted_gl[-4:])
@@ -886,10 +900,22 @@ class MiniGreenhouse(gym.Env):
         sio.savemat('fruit.mat', fruit_growth)
         
         if self.online_measurements == True:
-            # Load the updated data from the excel or from mqtt, for online or offline measurements, 
-            # we still need to call the data
+            # Load the updated data from the excel or from mqtt, for online or offline datasets, 
+            # we still need to call the data 
             # Get the oudoor measurements
             self.load_excel_or_mqtt_data(_action_drl)
+            
+            # Get the actions from the excel or drl from the load_excel_or_mqtt_data, for online or offline datasets
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = self.ventilation[-4:]
+            toplights = self.toplights[-4:]
+            heater = self.heater[-4:]
+                                    
+            # Keep only the latest 3 data points before appending
+            # Append controls to the lists
+            self.ventilation_list.extend(ventilation[-4:])
+            self.toplights_list.extend(toplights[-4:])
+            self.heater_list.extend(heater[-4:])
         
         # Run the script with the updated state variables
         if self.online_measurements == True:
@@ -954,7 +980,8 @@ class MiniGreenhouse(gym.Env):
         '''
         
         print("\n\n-------------------------------------------------------------------------------------")
-        print("Print all the appended data.")
+        print("PRINT ALL THE APPENDED DATA")
+        print("-------------------------------------------------------------------------------------")
         print(f"Length of Time: {len(self.time_excel_mqtt)}")
         print(f"Length of Action Ventilation: {len(self.ventilation_list)}")
         print(f"Length of Action Toplights: {len(self.toplights_list)}")
@@ -1010,7 +1037,7 @@ class MiniGreenhouse(gym.Env):
                                                             self.heater_list)
                         
             else:
-                print("---------------------------------------------------------------")
+                print("\n\n------------------------------------------------------------------------------------")
                 print("COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
                 
                 # Evaluate predictions to get R² and MAE metrics

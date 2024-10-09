@@ -36,13 +36,13 @@ env = MiniGreenhouse({"flag_run": True,
                     "first_day_dnn": 0,
                     "season_length_gl": 1/72,
                     "season_length_dnn": 0,
-                    "online_measurements": True,
+                    "online_measurements": False,
                     "action_from_drl": True,
                     "flag_run_dnn": True,
                     "flag_run_gl": True,
                     "flag_run_combined_models": True,
                     "is_mature": True,
-                    "max_steps": 21 #5 * 72 # 3 steps = 1 hour or 1 episode, so for 24 hours = 24 * 3 = 72 steps, 72 steps is equal to 24 hours
+                    "max_steps": 3 #5 * 72 # 3 steps = 1 hour or 1 episode, so for 24 hours = 24 * 3 = 72 steps, 72 steps is equal to 24 hours
                     })
 
 # Get the initial observation (should be: [0.0] for the starting position).

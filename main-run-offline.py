@@ -25,7 +25,7 @@ calibrator_model = MiniGreenhouse({"flag_run": True,
                         "flag_run_gl": True,
                         "flag_run_combined_models": True,
                         "is_mature": True,
-                        "max_steps": 6 #5*72 # 3 steps = 1 hour or 1 episode, so for 24 hours = 24 * 3 = 72 steps, 72 steps is equal to 24 hours
+                        "max_steps": 3 #2*72 # 3 steps = 1 hour or 1 episode, so for 24 hours = 24 * 3 = 72 steps, 72 steps is equal to 24 hours
                         })
 
 terminated = truncated = False

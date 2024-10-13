@@ -40,7 +40,9 @@ function DrlGlEnvironment(seasonLength, firstDay, controlsFile, outdoorFile, ind
     % Check if the outdoofile empty or not
     if isempty(outdoorFile)
         % Try to load outdoor measurements from the .mat file
+        disp('OUTDOOR FILE IS EMPTY');
     else    
+        disp('OUTDOOR FILE IS NOT EMPTY, LOAD FROM ONLINE MEASUREMENTS');
         %Load outdoor measurements from the .mat file
         outdoor_file = load(outdoorFile);
         outdoor_drl = [outdoor_file.time, outdoor_file.par_out, outdoor_file.temp_out, outdoor_file.hum_out, outdoor_file.co2_out];

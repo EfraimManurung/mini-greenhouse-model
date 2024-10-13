@@ -823,7 +823,7 @@ class MiniGreenhouse(gym.Env):
         if self.online_measurements == True:
             # Get the action from the DRL model 
             # print("RAW ACTION: ", _action_drl)
-            
+                        
             # Convert actions to discrete values
             ventilation = 1 if _action_drl[0] >= 0.5 else 0
             toplights = 1 if _action_drl[1] >= 0.5 else 0
@@ -833,6 +833,11 @@ class MiniGreenhouse(gym.Env):
             print("ventilation: ", ventilation)
             print("toplights: ", toplights)
             print("heater: ", heater)
+            
+            time_steps = np.linspace(300, 1200, 4)  # Time steps in seconds
+            ventilation = np.full(4, ventilation)
+            toplights = np.full(4, toplights)
+            heater = np.full(4, heater)
             
             # Format data controls in JSON format
             json_data = self.service_functions.format_data_in_JSON(time_steps, \

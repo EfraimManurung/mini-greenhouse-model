@@ -1,4 +1,4 @@
-# Developing a Robust Simulation Model for Autonomous Digital Twins System in a Real Mini-Greenhouse
+# Developing a Robust Simulation Model for an Autonomous Digital Twins System in an Experimental Greenhouse
 Efraim Manurung, dr. Qingzhi Liu, dr. Önder Babur
 
 Information Technology Group, Wageningen University, The Netherlands
@@ -25,11 +25,11 @@ updated [25/12/2024]
 To be filled! 
 
 # Related repositories
-- The IoT system for the Raspberry Pi (client) Firmware to monitor and control the mini-greenhouse with the sensors and actuators [mini-greenhouse-iot-system](https://github.com/EfraimManurung/mini-greenhouse-iot-system)
-- The ESP32 Weather station to measure outside mini-greenhouse (outdoor measurements) [mini-greenhouse-esp32-weather-station-serial](https://github.com/EfraimManurung/mini-greenhouse-esp32-weather-station-serial)
-- The example of white box (physics based model) based on the GreenLight [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model)
-- The black box main programs to train the DNN and LSTM to predict climate inside the mini-greenhouse [mini-greenhouse-dnn-lstm-models](https://github.com/EfraimManurung/mini-greenhouse-dnn-lstm-models)
-- This repository to run the DRL model in the PC (server) for the offline and online real-time experiments [robust-model-for-adt-mini-greenhouse](https://github.com/EfraimManurung/robust-model-for-adt-mini-greenhouse)
+- The IoT system for the Raspberry Pi (client) Firmware to monitor and control the mini-greenhouse with the sensors and actuators [greenhouse-iot-system](https://github.com/EfraimManurung/mini-greenhouse-iot-system)
+- The ESP32 Weather station to measure outside mini-greenhouse (outdoor measurements) [greenhouse-esp32-weather-station-serial](https://github.com/EfraimManurung/mini-greenhouse-esp32-weather-station-serial)
+- The example of white box (physics based model) based on the GreenLight [greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model)
+- The black box main programs to train the DNN and LSTM to predict climate inside the mini-greenhouse [greenhouse-dnn-lstm-models](https://github.com/EfraimManurung/mini-greenhouse-dnn-lstm-models)
+- This repository to run the DRL model in the PC (server) for the offline and online real-time experiments [greenhouse-robust-model-for-adt](https://github.com/EfraimManurung/robust-model-for-adt-greenhouse)
 
 # Pre-requirements
 1. Please install MATLAB application.

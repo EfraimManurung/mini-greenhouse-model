@@ -3,11 +3,23 @@ Efraim Manurung, dr. Qingzhi Liu, dr. Önder Babur
 
 Information Technology Group, Wageningen University, The Netherlands
 
+## System design
+![system-design](mini-greenhouse-pictures/system-design.png)
+
+
+## The mini-greenhouse
+![system-design](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.png)
+
+
+## Calibration Model
+![system-design](mini-greenhouse-pictures/training-dl-gl-lstm.png)
+
+
 ## To do list
 updated [25/12/2024]
 1. Add the main program files explanations
 2. Add more steps 
-3. to be filled!
+3. Add requirements.txt
 
 # Cite as
 To be filled! 

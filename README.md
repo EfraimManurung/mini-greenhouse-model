@@ -1,18 +1,18 @@
-# DRL and Calibration Model for IoT System with a Mini-Greenhouse
+# Developing a Robust Simulation Model for Autonomous Digital Twins System in a Real Mini-Greenhouse
 Efraim Manurung, dr. Qingzhi Liu, dr. Önder Babur
 
 Information Technology Group, Wageningen University, The Netherlands
 
 ## System design
-![system-design](mini-greenhouse-pictures/system-design.png)
+![system-design](mini-greenhouse-pictures/system-design.jpg)
 
 
 ## The mini-greenhouse
-![system-design](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.png)
+![system-design](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.jpg)
 
 
-## Calibration Model
-![system-design](mini-greenhouse-pictures/training-dl-gl-lstm.png)
+## Proposed model
+![system-design](mini-greenhouse-pictures/training-dl-gl-lstm.jpg)
 
 
 ## To do list
@@ -28,8 +28,8 @@ To be filled!
 - The IoT system for the Raspberry Pi (client) Firmware to monitor and control the mini-greenhouse with the sensors and actuators [mini-greenhouse-iot-system](https://github.com/EfraimManurung/mini-greenhouse-iot-system)
 - The ESP32 Weather station to measure outside mini-greenhouse (outdoor measurements) [mini-greenhouse-esp32-weather-station-serial](https://github.com/EfraimManurung/mini-greenhouse-esp32-weather-station-serial)
 - The example of white box (physics based model) based on the GreenLight [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model)
-- The black box main programs to train the DNN and LSTM to predict climate inside the mini-greenhouse [mini-greenhouse-model-train](https://github.com/EfraimManurung/mini-greenhouse-model-train)
-- Run the DRL model in the PC (server) for the offline and online real-time experiments [mini-greenhouse-model](https://github.com/EfraimManurung/mini-greenhouse-model)
+- The black box main programs to train the DNN and LSTM to predict climate inside the mini-greenhouse [mini-greenhouse-dnn-lstm-models](https://github.com/EfraimManurung/mini-greenhouse-dnn-lstm-models)
+- This repository to run the DRL model in the PC (server) for the offline and online real-time experiments [robust-model-for-adt-mini-greenhouse](https://github.com/EfraimManurung/robust-model-for-adt-mini-greenhouse)
 
 # Pre-requirements
 1. Please install MATLAB application.

@@ -155,7 +155,7 @@ class MiniGreenhouse(gym.Env):
         # Initialize a list to store rewards
         self.rewards_list = []
         
-        # Initialize reward
+        # Initialize rewardmatlab
         reward = 0
         
         # Record the reward for the first time
@@ -953,6 +953,10 @@ class MiniGreenhouse(gym.Env):
 
         # Truncated flag
         truncated = False
+        
+        # Save the result per step and save it in the excel files
+        if self.flag_run == True and self.online_measurements == True:
+            self.print_and_save_all_data_per_step('output/output_online_per_step.xlsx')
     
         return self.observation(), _reward, self.done(), truncated, {}
     
@@ -1388,6 +1392,111 @@ class MiniGreenhouse(gym.Env):
             self.par_in_predicted_combined_models = np.concatenate((self.par_in_predicted_combined_models, new_par_in_predicted_combined))
             self.leaf_temp_predicted_combined_models = np.concatenate((self.leaf_temp_predicted_combined_models, new_leaf_temp_predicted_combined))
             
+    def print_and_save_all_data_per_step(self, file_name):
+        '''
+        Print all the appended data and save to an Excel file.
+
+        Parameters:
+        - file_name: Name of the output Excel file
+        
+        - ventilation_list: List of action for fan/ventilation from DRL model or offline datasets
+        - toplights_list: List of action for toplights from DRL model or offline datasets
+        - heater_list: List of action for heater from DRL model or offline datasets
+        - reward_list: List of reward for iterated step
+        
+        - co2_in_excel_mqtt: List of actual CO2 values
+        - temp_in_excel_mqtt: List of actual temperature values
+        - rh_in_excel_mqtt: List of actual relative humidity values
+        - par_in_excel_mqtt: List of actual PAR values
+        
+        - co2_in_predicted_dnn: List of predicted CO2 values from Neural Network
+        - temp_in_predicted_dnn: List of predicted temperature values from Neural Network
+        - rh_in_predicted_dnn: List of predicted relative humidity values from Neural Network
+        - par_in_predicted_dnn: List of predicted PAR values from Neural Network
+        
+        - co2_in_predicted_gl: List of predicted CO2 values from Generalized Linear Model
+        - temp_in_predicted_gl: List of predicted temperature values from Generalized Linear Model
+        - rh_in_predicted_gl: List of predicted relative humidity values from Generalized Linear Model
+        - par_in_predicted_gl: List of predicted PAR values from Generalized Linear Model
+        '''
+                
+        # RUN WITH COMBINED MODELS!
+        if self.flag_run_combined_models == True:            
+            if self.action_from_drl == True and self.online_measurements == False:
+                print("---------------------------------------------------------------")
+                print("COMBINED MODELS | ACTION: DRL ON | OFFLINE")
+                
+                # Save all the data (included the actions) in an Excel file                
+                self.service_functions.export_to_excel(
+                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    None, None, None, None, None,
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
+                    self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
+                    self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, self.leaf_temp_predicted_combined_models
+                )
+                
+                # Save the rewards list 
+                self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
+                                       
+            else:
+                print("\n\n------------------------------------------------------------------------------------")
+                print("COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
+                
+                # Evaluate predictions to get R² and MAE metrics
+                metrics_dnn, metrics_gl, metrics_combined = self.evaluate_predictions()
+
+                # Save all the data in an Excel file
+                self.service_functions.export_to_excel(
+                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
+                    self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
+                    self.co2_in_predicted_combined_models, self.temp_in_predicted_combined_models, self.rh_in_predicted_combined_models, self.par_in_predicted_combined_models, self.leaf_temp_predicted_combined_models
+                )
+                
+                # Save the metrics data in an Excel file as table format
+                self.service_functions.export_evaluated_data_to_excel_table('output/metrics_table.xlsx', metrics_dnn, metrics_gl, metrics_combined)
+
+                # Save the rewards list 
+                self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
+                        
+        # RUN WITHOUT COMBINED MODELS!
+        elif self.flag_run_combined_models == False:
+            
+            # Run with dynamics control from the DRL action
+            if self.action_from_drl == True and self.online_measurements == False:
+                print("---------------------------------------------------------------")
+                print("NOT COMBINED MODELS | ACTION: DRL | OFFLINE")
+                
+                # Save all the data (included the actions) in an Excel file
+                self.service_functions.export_to_excel(
+                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
+                    self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
+                    None, None, None, None, None
+                )
+                
+                # Save the rewards list 
+                self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
+                                            
+            # Run with scheduled actions
+            else:
+                print("-------------------------------------------------------------------")
+                print("NOT COMBINED MODELS | ACTION: SCHEDULED OR DRL | OFFLINE OR ONLINE")
+                
+                # Save all the data in an Excel file                
+                self.service_functions.export_to_excel(
+                    file_name, self.time_combined_models, self.ventilation_list, self.toplights_list, self.heater_list, self.rewards_list,
+                    self.co2_in_excel_mqtt, self.temp_in_excel_mqtt, self.rh_in_excel_mqtt, self.global_in_excel_mqtt, self.leaf_temp_excel_mqtt,
+                    self.co2_in_predicted_dnn[:, 0], self.temp_in_predicted_dnn[:, 0], self.rh_in_predicted_dnn[:, 0], self.par_in_predicted_dnn[:, 0], self.leaf_temp_predicted_dnn[:, 0],
+                    self.co2_in_predicted_gl, self.temp_in_predicted_gl, self.rh_in_predicted_gl, self.par_in_predicted_gl, self.leaf_temp_predicted_gl,
+                    None, None, None, None, None
+                )
+                
+                # Save the rewards list 
+                self.service_functions.export_rewards_to_excel('output/rewards_list.xlsx', self.time_combined_models, self.rewards_list)
+    
     # Ensure to properly close the MATLAB engine when the environment is no longer used
     def __del__(self):
         self.eng.quit()

@@ -1,59 +1,71 @@
-# Developing a Robust Simulation Model for an Autonomous Digital Twins System in an Experimental Greenhouse
-Efraim Manurung, dr. Qingzhi Liu, dr. Önder Babur
+# Developing a Robust Simulation Model for an Autonomous Digital Twin System in an Experimental Greenhouse
 
-Information Technology Group, Wageningen University, The Netherlands
+**Authors:**  
+Efraim Manurung, Dr. Qingzhi Liu, Dr. Önder Babur  
+*Information Technology Group, Wageningen University, The Netherlands*
 
-## System design
-![system-design](mini-greenhouse-pictures/system-design.jpg)
+---
 
+## 🌱 Project Overview
+This repository contains the **simulation framework** for developing a **robust and calibrated digital twin system** in a mini-greenhouse environment.  
+The goal is to integrate **physics-based models (GreenLight)** with **data-driven approaches (DNN, LSTM, DRL)** for autonomous greenhouse climate control.  
 
-## The mini-greenhouse
-![system-design](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.jpg)
+---
 
+## 🏗️ System Design
+![system-design](mini-greenhouse-pictures/system-design.png)
 
-## Proposed model
-![system-design](mini-greenhouse-pictures/training-dl-gl-lstm.jpg)
+---
 
+## 🏡 The Mini-Greenhouse
+A small-scale experimental greenhouse equipped with climate sensors, actuators, and leaf sensors:  
+![mini-greenhouse](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.jpg)
 
-## To-do list
-updated [25/12/2024]
-1. Add the main program files' explanations
-2. Add more steps 
-3. Add requirements.txt
+---
 
-# Cite as
-To be filled! 
+## 🤖 Proposed Model
+Integration of DNN, LSTM, and DRL models into the digital twin loop with online calibration:  
+![proposed-model](mini-greenhouse-pictures/training-dl-gl-lstm.jpg)
 
-# Related repositories
-- The IoT system for the Raspberry Pi (client) Firmware to monitor and control the mini-greenhouse with the sensors and actuators [mini-greenhouse-iot-system](https://github.com/EfraimManurung/mini-greenhouse-iot-system)
-- The ESP32 Weather station to measure outside mini-greenhouse (outdoor measurements) [mini-greenhouse-esp32-weather-station-serial](https://github.com/EfraimManurung/mini-greenhouse-esp32-weather-station-serial)
-- The example of white box (physics-based model) based on the GreenLight [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model)
-- The black box main programs to train the DNN and LSTM to predict climate inside the mini-greenhouse [mini-greenhouse-dnn-lstm-models](https://github.com/EfraimManurung/mini-greenhouse-dnn-lstm-models)
-- This repository is to run the DRL model in the PC (server) for the offline and online real-time experiments [greenhouse-robust-model-for-adt](https://github.com/EfraimManurung/mini-greenhouse-model)
+---
 
-# Pre-requirements
-1. Please install the MATLAB application.
-2. Please install and follow the procedure from the [GreenLight](https://github.com/davkat1/GreenLight?tab=readme-ov-file#Using-the-model) as it's the main core program for the physics-based model.
-3. Please install RLlib .whl from this repository in the Installling Ray folder. Follow this link to install it [Installing Ray](https://docs.ray.io/en/latest/ray-overview/installation.html).
+## ✅ Changelog
 
-# Using the model
-1. Please follow the "Using the model" procedure from the original this link [GreenLight](https://github.com/davkat1/GreenLight?tab=readme-ov-file#Using-the-model). Do not forget to install the appropriate pre-requirements, such as the MATLAB version and DyMoMa package. Also, please don't forget to set the path of the folders appropriately.
-2. After it can run the example model of the original GreenLight. Try to run the exampleMiniGreenhouse in this repository [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model). The .mat file is inside the Code/runScenarios/exampleMiniGreenhouse.m. In here, it can run the example based on the parameters for the mini-greenhouse. These folders also need to be in the MATLAB path.
-3. After steps 1 and 2, run the main-run-offline.py in this repository [mini-greenhouse-model](https://github.com/EfraimManurung/mini-greenhouse-model), and do not forget to set the  path for the MATLAB folder to the MATLAB application. In here, the application can run the DNN and LSTM models. In addition, with main-run.py, we can run the DRL model. 
-4. to be filled!
+- [19-08-2025]
+  - Added initial `requirements.txt` with core dependencies (NumPy, Pandas, SciPy, Matplotlib, Seaborn, Scikit-learn, TensorFlow, PyTorch, Ray RLlib, Plotly, Tabulate, MATLAB Engine API, tqdm).
+  - Cleaned unnecessary libraries from `pip freeze` dump to keep the environment minimal and reproducible.
+  - Changed system design.
 
-# Explanation of the main program
-### main-train
-Explanation about the [`main-train.py`](https://github.com/EfraimManurung/mini-greenhouse-model/blob/main/main-run.py)
+---
 
+## 📂 Related Repositories
+This repository is part of a larger **mini-greenhouse digital twin ecosystem**:
 
-### main-run-offline
-Explanation about the [`main-run-offline.py`](https://github.com/EfraimManurung/mini-greenhouse-model/blob/main/main-run-offline.py)
+- 🌐 [mini-greenhouse-iot-system](https://github.com/EfraimManurung/mini-greenhouse-iot-system) – IoT firmware for Raspberry Pi (sensors & actuators)  
+- 🌦️ [mini-greenhouse-esp32-weather-station-serial](https://github.com/EfraimManurung/mini-greenhouse-esp32-weather-station-serial) – ESP32 weather station for outdoor measurements  
+- 📊 [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model) – Physics-based white-box model (GreenLight)  
+- 🧠 [mini-greenhouse-dnn-lstm-models](https://github.com/EfraimManurung/mini-greenhouse-dnn-lstm-models) – DNN & LSTM black-box models  
+- 🎛️ [mini-greenhouse-model](https://github.com/EfraimManurung/mini-greenhouse-model) – This repo: DRL model execution (offline & real-time experiments)  
 
+---
 
-### main-run
-Explanation about the [`main-run.py`](https://github.com/EfraimManurung/mini-greenhouse-model/blob/main/main-run.py)
+## ⚙️ Pre-requirements
+1. [MATLAB](https://www.mathworks.com/products/matlab.html) (required for GreenLight)  
+2. Install and follow setup from the [GreenLight model](https://github.com/davkat1/GreenLight?tab=readme-ov-file#Using-the-model)  
+3. Install **Ray RLlib** from the `.whl` file as described in [Ray Installation](https://docs.ray.io/en/latest/ray-overview/installation.html)  
 
-# Reference
-1. David Katzin, Simon van Mourik, Frank Kempkes, and Eldert J. Van Henten. 2020. “GreenLight - An Open Source Model for Greenhouses with Supplemental Lighting: Evaluation of Heat Requirements under LED and HPS Lamps.” Biosystems Engineering 194: 61–81. https://doi.org/10.1016/j.biosystemseng.2020.03.010
-2. To be filled!
+---
+
+## 🚀 Using the Model
+1. Follow the **"Using the model"** procedure from the [GreenLight documentation](https://github.com/davkat1/GreenLight?tab=readme-ov-file#Using-the-model).  
+   - Ensure MATLAB version & DyMoMa package are installed.  
+   - Set appropriate paths for the GreenLight folders.  
+
+2. Run the **example mini-greenhouse** model:  
+   - Repository: [mini-greenhouse-greenlight-model](https://github.com/EfraimManurung/mini-greenhouse-greenlight-model)  
+   - File: `Code/runScenarios/exampleMiniGreenhouse.m`  
+   - This runs the scaled-down mini-greenhouse parameters.  
+
+3. Run the offline DRL/DNN/LSTM simulations (recommended if you do not have the Raspberry Pi setup):  
+   ```bash
+   python main-run-offline.py

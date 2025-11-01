@@ -1,7 +1,7 @@
 # Developing a Robust Simulation Model for an Autonomous Digital Twin System in an Experimental Greenhouse
 
 **Authors:**  
-Efraim Manurung, Dr. Qingzhi Liu, Dr. Önder Babur  
+Efraim Manurung, M.Sc., Dr. Qingzhi Liu \
 *Information Technology Group, Wageningen University, The Netherlands*
 
 ---
@@ -22,6 +22,14 @@ A small-scale experimental greenhouse equipped with climate sensors, actuators, 
 ![mini-greenhouse](mini-greenhouse-pictures/gh-pictures-leaf-sensors-details.jpg)
 
 ---
+
+## The Hardware Design
+![hardware-design](mini-greenhouse-pictures/raspi-esp32-hardware-design.jpg)
+
+---
+
+## The Power Supply Design
+![power-supply](mini-greenhouse-pictures/power-hardware-node-system.jpg)
 
 ## 🤖 Proposed Model
 Integration of DNN, LSTM, and DRL models into the digital twin loop with online calibration:  
